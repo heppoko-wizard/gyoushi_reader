@@ -34,8 +34,11 @@ async function loadTextFromFile(filename) {
 const TRAP_BURBON_HOUSE = `
 
 　　　 ∧＿＿∧　やあ
+
 　　 （´・ω・｀)　　　　　 /
+
 　　／::∇y:::::＼　　　[￣￣]
+
   |:::⊃:|:::::|      |──|
 
 ￣￣￣￣￣￣￣￣￣￣￣￣￣￣￣￣￣|
@@ -1350,7 +1353,7 @@ export default function App() {
 
               <RetroButton onClick={() => loadSampleText('sample_text_3.txt')}>銀河鉄道の夜</RetroButton>
 
-              <RetroButton onClick={() => loadSampleText('sample_text_2.txt')}>--ルイズコピペ--</RetroButton>
+              <RetroButton onClick={() => loadSampleText('sample_text_2.txt')}>ルイズコピペ</RetroButton>
 
             </div>
 
