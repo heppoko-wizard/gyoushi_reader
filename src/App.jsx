@@ -607,11 +607,27 @@ export default function App() {
               }
             } else {
               // 付属語なのでくっつける
-              // ただし、長くなりすぎる場合は切る（maxCharLength考慮）
-              if (buffer.length + token.surface.length > maxCharLength * 2) { // 許容範囲を少し広めに
-                finalWords.push(buffer);
-                buffer = token.surface;
+              const newLength = buffer.length + token.surface.length;
+
+              // maxCharLengthを超える場合
+              if (newLength > maxCharLength) {
+                // バッファが既にmaxCharLengthを超えている場合は、そのまま追加してから分割
+                if (buffer.length >= maxCharLength) {
+                  finalWords.push(buffer);
+                  buffer = token.surface;
+                } else {
+                  // まだ超えていない場合は、トークンを追加してから判断
+                  buffer += token.surface;
+
+                  // 追加後にmaxCharLengthを大きく超える場合（1.5倍以上）は次で確実に分割
+                  if (buffer.length > maxCharLength * 1.5) {
+                    finalWords.push(buffer);
+                    buffer = "";
+                  }
+                  // maxCharLength以上だが1.5倍未満の場合は、次のトークンで判断
+                }
               } else {
+                // maxCharLength以内なら普通に結合
                 buffer += token.surface;
               }
             }
@@ -1335,8 +1351,6 @@ export default function App() {
               <RetroButton onClick={() => loadSampleText('sample_text_3.txt')}>銀河鉄道の夜</RetroButton>
 
               <RetroButton onClick={() => loadSampleText('sample_text_2.txt')}>ルイズコピペ</RetroButton>
-
-              <RetroButton onClick={() => loadSampleText('sample_text_4.txt')}>堕落論</RetroButton>
 
             </div>
 
