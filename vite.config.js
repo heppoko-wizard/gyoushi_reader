@@ -31,7 +31,6 @@ export default defineConfig({
         global: true,
         process: true,
       },
-      protocolImports: false, // Disable SES lockdown to allow zlibjs to work
     }),
     dictionaryHeaderPlugin(),
   ],
