@@ -10,6 +10,7 @@
         "deploy": "npm run build && gh-pages -d dist"
     },
     "dependencies": {
+        "jszip": "^3.10.1",
         "kuromoji": "^0.1.2",
         "lucide-react": "^0.292.0",
         "pako": "^2.1.0",

@@ -6,31 +6,6 @@ console.log('📍 [STARTUP] Current location:', window.location.href);
 console.log('📍 [STARTUP] User Agent:', navigator.userAgent);
 console.log('📍 [STARTUP] Time:', new Date().toISOString());
 
-// ============================================================
-// pako をグローバルに設定（kuromoji用）
-// zlibjs の代わりに pako を使用（SES lockdown の問題を回避）
-// ============================================================
-console.log('⬇️ [PAKO] Loading pako library...');
-import pako from 'pako';
-
-// kuromoji が期待する形式で pako をグローバルに設定
-window.Zlib = {
-    Gunzip: function (data) {
-        // pako の inflate を使ってデータを展開
-        return {
-            decompress: function () {
-                console.log('🔧 [PAKO] Decompressing data with pako...');
-                return pako.inflate(data);
-            },
-            ip: 0,
-            op: 0
-        };
-    }
-};
-
-console.log('✅ [PAKO] pako loaded and configured as window.Zlib');
-console.log('🔍 [PAKO] window.Zlib.Gunzip exists:', typeof window.Zlib.Gunzip !== 'undefined');
-
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'

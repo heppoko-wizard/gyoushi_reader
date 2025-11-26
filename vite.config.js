@@ -42,7 +42,7 @@ export default defineConfig({
   },
   base: '/gyoushi_reader/',
   optimizeDeps: {
-    include: ['kuromoji', 'pako'],
+    include: ['kuromoji', 'jszip'],
   },
   build: {
     commonjsOptions: {
@@ -53,7 +53,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           kuromoji: ['kuromoji'],
-          pako: ['pako'],
+          jszip: ['jszip'],
         },
       },
     },

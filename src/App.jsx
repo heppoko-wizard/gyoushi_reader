@@ -400,79 +400,105 @@ export default function App() {
 
   // --- テキスト解析 ---
 
-  // --- テキスト解析 ---
-
   const [tokenizer, setTokenizer] = useState(null);
   const [isTokenizerLoading, setIsTokenizerLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStatus, setLoadingStatus] = useState('初期化中...');
 
-  // ★ Kuromojiの初期化 (プリロード付き)
+  // ★ Kuromojiの初期化 (ZIP解凍方式)
   useEffect(() => {
     console.log('🚀 [INIT] App component mounted - Starting initialization');
     console.log('📍 [ENV] BASE_URL:', import.meta.env.BASE_URL);
     console.log('📍 [ENV] MODE:', import.meta.env.MODE);
     console.log('📍 [ENV] PROD:', import.meta.env.PROD);
 
-    const DICT_FILES = [
-      'base.dat.gz', 'check.dat.gz', 'tid.dat.gz', 'tid_pos.dat.gz', 'tid_map.dat.gz',
-      'cc.dat.gz', 'unk.dat.gz', 'unk_pos.dat.gz', 'unk_map.dat.gz',
-      'unk_char.dat.gz', 'unk_compat.dat.gz', 'unk_invoke.dat.gz'
-    ];
-
-    const preloadDictionary = async () => {
-      console.log('📚 [DICT] Starting dictionary preload');
+    const loadDictionaryFromZip = async () => {
+      console.log('📚 [DICT] Starting dictionary load from ZIP');
       setLoadingStatus('辞書データをダウンロード中...');
-      let loadedCount = 0;
-      const totalFiles = DICT_FILES.length;
-      const baseUrl = import.meta.env.BASE_URL + 'dict/';
+      const baseUrl = import.meta.env.BASE_URL;
 
       try {
-        console.log('📂 [DICT] Dictionary Base URL:', baseUrl);
-        console.log('📂 [DICT] Total files to download:', totalFiles);
+        // JSZipをインポート
+        console.log('📦 [ZIP] Loading JSZip library...');
+        const JSZip = (await import('jszip')).default;
+        console.log('✅ [ZIP] JSZip loaded');
 
-        // path shimの確認
-        console.log('🔧 [PATH] Checking path module...');
-        try {
-          const path = await import('path');
-          console.log('✅ [PATH] Path module loaded successfully:', path);
-        } catch (e) {
-          console.error('❌ [PATH] Failed to load path module:', e);
+        // ZIPファイルをダウンロード
+        const zipUrl = `${baseUrl}dict/dic.zip`;
+        console.log('⬇️ [ZIP] Downloading:', zipUrl);
+        setLoadingStatus('辞書ZIPファイルをダウンロード中...');
+
+        const response = await fetch(zipUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to download dic.zip: ${response.status} ${response.statusText}`);
         }
 
-        console.log('⬇️ [DOWNLOAD] Starting sequential download of dictionary files...');
-        // 順次ダウンロード (並列だとエラーが起きやすい場合があるため)
-        for (const file of DICT_FILES) {
-          try {
-            console.log(`⬇️ [DOWNLOAD] Fetching: ${file}`);
-            const response = await fetch(baseUrl + file);
-            console.log(`📦 [DOWNLOAD] ${file} - Status: ${response.status}, Content-Type: ${response.headers.get('Content-Type')}`);
+        const zipBlob = await response.blob();
+        console.log(`✅ [ZIP] Downloaded (${zipBlob.size} bytes)`);
+        setLoadingProgress(30);
 
-            if (!response.ok) throw new Error(`Status ${response.status}`);
+        // ZIPファイルを解凍
+        console.log('📂 [ZIP] Extracting ZIP file...');
+        setLoadingStatus('辞書ファイルを解凍中...');
+        const zip = await JSZip.loadAsync(zipBlob);
+        console.log('✅ [ZIP] ZIP file loaded');
+        setLoadingProgress(50);
 
-            // キャッシュさせるためにblobとして取得
-            const blob = await response.blob();
-            console.log(`✅ [DOWNLOAD] ${file} - Downloaded (${blob.size} bytes)`);
+        // 解凍したファイルをメモリに保存
+        console.log('💾 [ZIP] Extracting individual files...');
+        const files = {};
+        const fileNames = Object.keys(zip.files);
+        console.log(`📋 [ZIP] Found ${fileNames.length} files in ZIP`);
 
-            loadedCount++;
-            const progress = Math.floor((loadedCount / totalFiles) * 100);
-            console.log(`📊 [PROGRESS] ${loadedCount}/${totalFiles} files (${progress}%)`);
-            setLoadingProgress(progress);
-          } catch (e) {
-            console.error(`❌ [DOWNLOAD] Failed to download ${file}:`, e);
-            throw new Error(`${file}: ${e.message}`);
+        for (const fileName of fileNames) {
+          if (!zip.files[fileName].dir) {
+            console.log(`📄 [ZIP] Extracting: ${fileName}`);
+            const content = await zip.files[fileName].async('arraybuffer');
+            files[fileName] = new Uint8Array(content);
+            console.log(`✅ [ZIP] Extracted ${fileName} (${files[fileName].length} bytes)`);
           }
         }
 
-        console.log('✅ [DOWNLOAD] All dictionary files downloaded successfully');
-        console.log('🔨 [BUILD] Starting Kuromoji tokenizer construction...');
+        setLoadingProgress(70);
+        console.log('✅ [ZIP] All files extracted successfully');
+
+        // Kuromojiビルダーを作成
+        console.log('🔨 [BUILD] Creating Kuromoji builder...');
         setLoadingStatus('辞書を構築中...');
 
-        // ダウンロード完了後にKuromojiを構築
+        // カスタムローダーを使ってkuromojiに解凍済みデータを渡す
         const builder = kuromoji.builder({
-          dicPath: baseUrl
+          dicPath: baseUrl + 'dict/',
         });
-        console.log('🔨 [BUILD] Builder created, calling build()...');
+
+        // kuromojiの内部ローダーを上書きして、解凍済みファイルを使用
+        const originalLoadArrayBuffer = builder.loadArrayBuffer;
+        builder.loadArrayBuffer = function (url, callback) {
+          console.log(`🔍 [LOADER] Kuromoji requested: ${url}`);
+
+          // URLからファイル名を抽出
+          const fileName = url.split('/').pop();
+
+          // .gzを除去したファイル名も試す
+          const fileNameWithoutGz = fileName.replace(/\.gz$/, '');
+
+          console.log(`🔍 [LOADER] Looking for: ${fileName} or ${fileNameWithoutGz}`);
+
+          if (files[fileName]) {
+            console.log(`✅ [LOADER] Found ${fileName} in extracted files`);
+            callback(null, files[fileName].buffer);
+          } else if (files[fileNameWithoutGz]) {
+            console.log(`✅ [LOADER] Found ${fileNameWithoutGz} in extracted files`);
+            callback(null, files[fileNameWithoutGz].buffer);
+          } else {
+            console.error(`❌ [LOADER] File not found: ${fileName} or ${fileNameWithoutGz}`);
+            console.error(`Available files:`, Object.keys(files));
+            callback(new Error(`File not found: ${fileName}`), null);
+          }
+        };
+
+        console.log('🔨 [BUILD] Building tokenizer...');
+        setLoadingProgress(80);
 
         builder.build((err, _tokenizer) => {
           if (err) {
@@ -484,17 +510,18 @@ export default function App() {
           console.log('✅ [BUILD] Kuromoji tokenizer initialized successfully!');
           setTokenizer(_tokenizer);
           setIsTokenizerLoading(false);
+          setLoadingProgress(100);
           console.log('🎉 [INIT] Complete! Application is ready.');
         });
 
       } catch (error) {
-        console.error('❌ [ERROR] Dictionary preload failed:', error);
+        console.error('❌ [ERROR] Dictionary load failed:', error);
         console.error('❌ [ERROR] Error stack:', error.stack);
-        setLoadingStatus(`辞書のダウンロードに失敗しました: ${error.message} (URL: ${baseUrl})`);
+        setLoadingStatus(`辞書の読み込みに失敗しました: ${error.message}`);
       }
     };
 
-    preloadDictionary();
+    loadDictionaryFromZip();
   }, []);
 
 
