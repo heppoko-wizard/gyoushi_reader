@@ -25,7 +25,7 @@ export default defineConfig({
   plugins: [
     react(),
     nodePolyfills({
-      include: ['path', 'util', 'stream', 'buffer'],
+      include: ['path', 'util', 'stream', 'buffer', 'zlib'],
       globals: {
         Buffer: true,
         global: true,
@@ -40,4 +40,10 @@ export default defineConfig({
     },
   },
   base: '/gyoushi_reader/',
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
+  },
 })
