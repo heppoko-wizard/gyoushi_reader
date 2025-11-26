@@ -25,7 +25,8 @@ export default defineConfig({
   plugins: [
     react(),
     nodePolyfills({
-      include: ['path', 'util', 'stream', 'buffer', 'zlib'],
+      // zlibを除外（pakoを使用するため）
+      include: ['path', 'util', 'stream', 'buffer'],
       globals: {
         Buffer: true,
         global: true,
@@ -37,12 +38,11 @@ export default defineConfig({
   resolve: {
     alias: {
       path: 'path-browserify',
-      'zlibjs/bin/gunzip.min.js': 'zlibjs/bin/gunzip.min.js',
     },
   },
   base: '/gyoushi_reader/',
   optimizeDeps: {
-    include: ['kuromoji', 'zlibjs/bin/gunzip.min.js'],
+    include: ['kuromoji', 'pako'],
   },
   build: {
     commonjsOptions: {
@@ -53,7 +53,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           kuromoji: ['kuromoji'],
-          zlibjs: ['zlibjs/bin/gunzip.min.js'],
+          pako: ['pako'],
         },
       },
     },

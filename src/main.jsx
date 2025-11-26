@@ -7,23 +7,29 @@ console.log('📍 [STARTUP] User Agent:', navigator.userAgent);
 console.log('📍 [STARTUP] Time:', new Date().toISOString());
 
 // ============================================================
-// zlibjs のロード（エラーが出る可能性がある箇所）
+// pako をグローバルに設定（kuromoji用）
+// zlibjs の代わりに pako を使用（SES lockdown の問題を回避）
 // ============================================================
-console.log('⬇️ [ZLIB] Loading zlibjs/bin/gunzip.min.js...');
-// zlibjs を明示的にインポートしてグローバルで利用可能にする
-// kuromoji が require("zlibjs/bin/gunzip.min.js") で使用するため
-import 'zlibjs/bin/gunzip.min.js';
-// zlibjs は UMD モジュールなので、window.Zlib として自動的にグローバルに設定されます
+console.log('⬇️ [PAKO] Loading pako library...');
+import pako from 'pako';
 
-// zlibjsがロードされた後の確認
-console.log('🔍 [ZLIB] Import statement executed');
-console.log('🔍 [ZLIB] window.Zlib exists:', typeof window !== 'undefined' && typeof window.Zlib !== 'undefined');
-if (typeof window !== 'undefined' && typeof window.Zlib !== 'undefined') {
-    console.log('🔍 [ZLIB] window.Zlib.Gunzip exists:', typeof window.Zlib.Gunzip !== 'undefined');
-    console.log('✅ [ZLIB] zlibjs loaded successfully');
-} else {
-    console.warn('⚠️ [ZLIB] window.Zlib is not defined yet (may be defined later)');
-}
+// kuromoji が期待する形式で pako をグローバルに設定
+window.Zlib = {
+    Gunzip: function (data) {
+        // pako の inflate を使ってデータを展開
+        return {
+            decompress: function () {
+                console.log('🔧 [PAKO] Decompressing data with pako...');
+                return pako.inflate(data);
+            },
+            ip: 0,
+            op: 0
+        };
+    }
+};
+
+console.log('✅ [PAKO] pako loaded and configured as window.Zlib');
+console.log('🔍 [PAKO] window.Zlib.Gunzip exists:', typeof window.Zlib.Gunzip !== 'undefined');
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'
