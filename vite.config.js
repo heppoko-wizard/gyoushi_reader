@@ -40,10 +40,20 @@ export default defineConfig({
     },
   },
   base: '/gyoushi_reader/',
+  optimizeDeps: {
+    include: ['kuromoji', 'zlibjs/bin/gunzip.min.js'],
+  },
   build: {
     commonjsOptions: {
       include: [/node_modules/],
       transformMixedEsModules: true,
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          kuromoji: ['kuromoji'],
+        },
+      },
     },
   },
 })
