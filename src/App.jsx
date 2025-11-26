@@ -29,68 +29,7 @@ async function loadTextFromFile(filename) {
 }
 
 
-// --- トラップテキスト定義 ---
 
-const TRAP_BURBON_HOUSE = `
-
-　　　 ∧＿＿∧　やあ
-
-　　 （´・ω・｀)　　　　　 /
-
-　　／::∇y:::::＼　　　[￣￣]
-
-  |:::⊃:|:::::|      |──|
-
-￣￣￣￣￣￣￣￣￣￣￣￣￣￣￣￣￣|
-￣￣￣￣￣￣￣￣￣￣￣￣￣￣ |￣￣
-￣￣￣￣￣￣￣￣￣￣￣￣￣￣ |
-　　　　∇　∇　∇　∇　  ／ |
-　　　　┴　┴　┴　┴　／ ／|
-￣￣￣￣￣￣￣￣￣￣￣￣|／　|
-￣￣￣￣￣￣￣￣￣￣￣￣　　 |
-　　(⊆⊇)　(⊆⊇)　(⊆⊇)　 |
-
-  　||　　　||　　　||　　 |
-
-やあ （´・ω・｀)
-
-
-
-ようこそ、バーボンハウスへ。
-
-
-
-このバーボンはサービスだから、まず飲んで落ち着いて欲しい。
-
-
-
-うん、「また」なんだ。済まない。
-
-
-
-仏の顔もって言うしね、謝って許してもらおうとも思っていない。
-
-
-
-でも、このリンクを見たとき、君は、きっと言葉では言い表せない
-
-
-
-「きらめき」みたいなものを感じてくれたと思う。
-
-
-
-殺伐とした世の中で、そういう気持ちを忘れないで欲しい
-
-
-
-そう思って、このページを立てたんだ。
-
-
-
-じゃあ、馴れ合いは禁止だ。
-
-`;
 
 
 
@@ -120,15 +59,11 @@ export default function App() {
 
 
 
-  const [showTrap, setShowTrap] = useState(false);
-
-  const [trapContent, setTrapContent] = useState('');
 
 
 
-  // ★ カウンター: 固定値
 
-  const [hitCount] = useState(373737);
+
 
 
 
@@ -140,9 +75,7 @@ export default function App() {
 
 
 
-  // ★ Linkメニューの開閉状態
 
-  const [isLinkOpen, setIsLinkOpen] = useState(false);
 
 
 
@@ -596,15 +529,7 @@ export default function App() {
 
 
 
-  const handleTrap = (e) => {
 
-    e.preventDefault();
-
-    setTrapContent(TRAP_BURBON_HOUSE);
-
-    setShowTrap(true);
-
-  };
 
 
 
@@ -772,17 +697,7 @@ export default function App() {
 
           
 
-          @keyframes marquee {
 
-            0% { transform: translateX(100%); }
-
-            100% { transform: translateX(-100%); }
-
-          }
-
-          .marquee-container { overflow: hidden; white-space: nowrap; background: #ff69b4; color: yellow; font-weight: bold; border: 2px solid #ff1493; }
-
-          .marquee-text { display: inline-block; animation: marquee 10s linear infinite; padding: 2px 0; }
 
           .blink { animation: blinker 1s linear infinite; }
 
@@ -814,17 +729,7 @@ export default function App() {
 
 
 
-      {/* マーキーエリア */}
 
-      <div className="marquee-container mb-2 relative z-10">
-
-        <div className="marquee-text">
-
-          ★☆★ ようこそバーサナ技術開発部へ！！ ★☆★ キリ番{hitCount}踏んだ人はBBSにカキコしてね！！ ★☆★ 踏み逃げ厳禁！！
-
-        </div>
-
-      </div>
 
 
 
@@ -849,93 +754,7 @@ export default function App() {
         {/* 2カラムレイアウト */}
         <div className="flex flex-col md:flex-row gap-2">
 
-          <div className="w-full md:w-48 bg-[#fff0f5] border-2 border-inset border-[#ff69b4] p-2 text-center h-fit shrink-0">
 
-            <div className="bg-[#ff69b4] text-white font-bold mb-2 text-sm">☆ MENU ☆</div>
-
-            <ul className="text-xs space-y-1 text-blue-600 underline">
-
-              {['Top', 'Profile', 'Diary', 'BBS'].map((item) => (
-
-                <li key={item} onClick={handleTrap} className="cursor-pointer hover:text-red-500">
-
-                  {item}
-
-                </li>
-
-              ))}
-
-
-
-              {/* Linkメニュー (クリックで展開) */}
-
-              <li onClick={() => setIsLinkOpen(!isLinkOpen)} className="cursor-pointer hover:text-red-500 select-none">
-
-                Link {isLinkOpen ? '▼' : '▶'}
-
-              </li>
-
-
-
-              {/* 展開されるリンク集 */}
-
-              {isLinkOpen && (
-
-                <div className="pl-2 my-1 space-y-1 text-left">
-
-                  <li className="cursor-pointer hover:text-red-500 list-none">
-
-                    <a href="https://twitter.com/sana_natori" target="_blank" rel="noreferrer">名取さな公式Twitter</a>
-
-                  </li>
-
-                  <li className="cursor-pointer hover:text-red-500 list-none">
-
-                    <a href="https://www.youtube.com/channel/UCIdEIHpS0TdkqRkHL5OkLtA" target="_blank" rel="noreferrer">さなちゃんねる</a>
-
-                  </li>
-
-                </div>
-
-              )}
-
-
-
-              <li onClick={handleTrap} className="cursor-pointer hover:text-red-500">
-
-                Mail
-
-              </li>
-
-            </ul>
-
-
-
-            <div className="mt-4 mb-2">
-
-              <div className="text-[10px] mb-1">あなたは</div>
-
-              <div className="bg-black text-red-500 font-mono text-lg border-2 border-gray-500 inline-block px-2 tracking-widest">
-
-                {/* 固定値の表示 */}
-
-                {hitCount}
-
-              </div>
-
-              <div className="text-[10px] mt-1">人目のせんせえです</div>
-
-            </div>
-
-
-
-            <div className="mt-4 border-t border-dashed border-[#ff69b4] pt-2">
-
-              <div className="text-[10px] mt-1 cursor-pointer hover:text-red-500" onClick={handleTrap}>相互リンク募集中v</div>
-
-            </div>
-
-          </div>
 
 
 
@@ -1157,7 +976,7 @@ export default function App() {
 
                 <div>
 
-                  <span className="font-bold block mb-1 text-[#ff1493]">■ 区切り方</span>
+                  <span className="font-bold block mb-1 text-[#ff1493]">■ 区切り方(諸々の設定は再生を停止して、別の本を読み込むと反映されます。難しかったのでごめん！！)</span>
 
                   <div className="flex gap-2 mb-2">
 
@@ -1342,57 +1161,7 @@ export default function App() {
 
 
 
-      {/* バーボンハウス・トラップモーダル */}
 
-      {showTrap && (
-
-        <div
-
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 font-mono text-white p-4"
-
-          onClick={() => setShowTrap(false)}
-
-        >
-
-          <div
-
-            className="max-w-2xl bg-black border-4 border-double border-white p-8 whitespace-pre-wrap leading-relaxed relative text-center shadow-[0_0_15px_rgba(255,255,255,0.7)]"
-
-            onClick={(e) => e.stopPropagation()}
-
-          >
-
-            <button
-
-              className="absolute top-2 right-2 text-white hover:text-red-500"
-
-              onClick={() => setShowTrap(false)}
-
-            >
-
-              <X size={24} />
-
-            </button>
-
-            {/* AA表示エリア修正 */}
-
-            <div className={`text-sm mb-4 text-red-500`}>
-
-              <pre className="font-['MS_PGothic','Osaka',sans-serif] text-left overflow-x-auto leading-[0.5] whitespace-pre">{TRAP_BURBON_HOUSE.trim()}</pre>
-
-            </div>
-
-            <RetroButton onClick={() => setShowTrap(false)} className="mt-4">
-
-              [Close]
-
-            </RetroButton>
-
-          </div>
-
-        </div>
-
-      )}
 
     </div>
 
