@@ -1,7 +1,29 @@
+// ============================================================
+// 🚀 STARTUP LOG - アプリケーション起動の最初のログ
+// ============================================================
+console.log('🚀🚀🚀 [STARTUP] main.jsx loaded - Application starting...');
+console.log('📍 [STARTUP] Current location:', window.location.href);
+console.log('📍 [STARTUP] User Agent:', navigator.userAgent);
+console.log('📍 [STARTUP] Time:', new Date().toISOString());
+
+// ============================================================
+// zlibjs のロード（エラーが出る可能性がある箇所）
+// ============================================================
+console.log('⬇️ [ZLIB] Loading zlibjs/bin/gunzip.min.js...');
 // zlibjs を明示的にインポートしてグローバルで利用可能にする
 // kuromoji が require("zlibjs/bin/gunzip.min.js") で使用するため
 import 'zlibjs/bin/gunzip.min.js';
 // zlibjs は UMD モジュールなので、window.Zlib として自動的にグローバルに設定されます
+
+// zlibjsがロードされた後の確認
+console.log('🔍 [ZLIB] Import statement executed');
+console.log('🔍 [ZLIB] window.Zlib exists:', typeof window !== 'undefined' && typeof window.Zlib !== 'undefined');
+if (typeof window !== 'undefined' && typeof window.Zlib !== 'undefined') {
+    console.log('🔍 [ZLIB] window.Zlib.Gunzip exists:', typeof window.Zlib.Gunzip !== 'undefined');
+    console.log('✅ [ZLIB] zlibjs loaded successfully');
+} else {
+    console.warn('⚠️ [ZLIB] window.Zlib is not defined yet (may be defined later)');
+}
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'

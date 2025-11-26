@@ -409,6 +409,11 @@ export default function App() {
 
   // ★ Kuromojiの初期化 (プリロード付き)
   useEffect(() => {
+    console.log('🚀 [INIT] App component mounted - Starting initialization');
+    console.log('📍 [ENV] BASE_URL:', import.meta.env.BASE_URL);
+    console.log('📍 [ENV] MODE:', import.meta.env.MODE);
+    console.log('📍 [ENV] PROD:', import.meta.env.PROD);
+
     const DICT_FILES = [
       'base.dat.gz', 'check.dat.gz', 'tid.dat.gz', 'tid_pos.dat.gz', 'tid_map.dat.gz',
       'cc.dat.gz', 'unk.dat.gz', 'unk_pos.dat.gz', 'unk_map.dat.gz',
@@ -416,59 +421,75 @@ export default function App() {
     ];
 
     const preloadDictionary = async () => {
+      console.log('📚 [DICT] Starting dictionary preload');
       setLoadingStatus('辞書データをダウンロード中...');
       let loadedCount = 0;
       const totalFiles = DICT_FILES.length;
       const baseUrl = import.meta.env.BASE_URL + 'dict/';
 
       try {
-        console.log('Dictionary Base URL:', baseUrl);
+        console.log('📂 [DICT] Dictionary Base URL:', baseUrl);
+        console.log('📂 [DICT] Total files to download:', totalFiles);
+
         // path shimの確認
+        console.log('🔧 [PATH] Checking path module...');
         try {
           const path = await import('path');
-          console.log('Path module loaded:', path);
+          console.log('✅ [PATH] Path module loaded successfully:', path);
         } catch (e) {
-          console.error('Failed to load path module:', e);
+          console.error('❌ [PATH] Failed to load path module:', e);
         }
 
+        console.log('⬇️ [DOWNLOAD] Starting sequential download of dictionary files...');
         // 順次ダウンロード (並列だとエラーが起きやすい場合があるため)
         for (const file of DICT_FILES) {
           try {
+            console.log(`⬇️ [DOWNLOAD] Fetching: ${file}`);
             const response = await fetch(baseUrl + file);
-            console.log(`[Preload] ${file} - Status: ${response.status}, Content-Type: ${response.headers.get('Content-Type')}`);
+            console.log(`📦 [DOWNLOAD] ${file} - Status: ${response.status}, Content-Type: ${response.headers.get('Content-Type')}`);
 
             if (!response.ok) throw new Error(`Status ${response.status}`);
 
             // キャッシュさせるためにblobとして取得
-            await response.blob();
+            const blob = await response.blob();
+            console.log(`✅ [DOWNLOAD] ${file} - Downloaded (${blob.size} bytes)`);
 
             loadedCount++;
-            setLoadingProgress(Math.floor((loadedCount / totalFiles) * 100));
+            const progress = Math.floor((loadedCount / totalFiles) * 100);
+            console.log(`📊 [PROGRESS] ${loadedCount}/${totalFiles} files (${progress}%)`);
+            setLoadingProgress(progress);
           } catch (e) {
+            console.error(`❌ [DOWNLOAD] Failed to download ${file}:`, e);
             throw new Error(`${file}: ${e.message}`);
           }
         }
 
+        console.log('✅ [DOWNLOAD] All dictionary files downloaded successfully');
+        console.log('🔨 [BUILD] Starting Kuromoji tokenizer construction...');
         setLoadingStatus('辞書を構築中...');
 
         // ダウンロード完了後にKuromojiを構築
         const builder = kuromoji.builder({
           dicPath: baseUrl
         });
+        console.log('🔨 [BUILD] Builder created, calling build()...');
 
         builder.build((err, _tokenizer) => {
           if (err) {
-            console.error('Kuromoji initialization failed:', err);
+            console.error('❌ [BUILD] Kuromoji initialization failed:', err);
+            console.error('❌ [BUILD] Error details:', JSON.stringify(err, null, 2));
             setLoadingStatus(`辞書の構築に失敗しました: ${err.message}`);
             return;
           }
-          console.log('Kuromoji initialized');
+          console.log('✅ [BUILD] Kuromoji tokenizer initialized successfully!');
           setTokenizer(_tokenizer);
           setIsTokenizerLoading(false);
+          console.log('🎉 [INIT] Complete! Application is ready.');
         });
 
       } catch (error) {
-        console.error('Dictionary preload failed:', error);
+        console.error('❌ [ERROR] Dictionary preload failed:', error);
+        console.error('❌ [ERROR] Error stack:', error.stack);
         setLoadingStatus(`辞書のダウンロードに失敗しました: ${error.message} (URL: ${baseUrl})`);
       }
     };
