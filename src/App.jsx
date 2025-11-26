@@ -1,53 +1,32 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import kuromoji from 'kuromoji';
 
 import { Play, X, Settings, Monitor, Type } from 'lucide-react';
 
 
 
-// --- サンプルテキスト定義 ---
+// --- 外部ファイルからテキストを読み込む関数 ---
 
-const SAMPLE_TEXT_1 = `手袋を買いに
-
-新美南吉
-
-
-
-寒い冬が北方から、狐の親子の棲んでいる森へもやって来ました。
-
-或朝洞穴から子供の狐が出ようとしましたが、「あっ」と叫んで眼を抑えながら母さん狐のところへころげて来ました。
-
-「母ちゃん、眼に何か刺さった、ぬいて頂戴早く早く」と言いました。
-
-母さん狐がびっくりして、あわてふためきながら、眼を抑えている子供の手を恐る恐るとりのけて見ましたが、何も刺さってはいませんでした。母さん狐は洞穴の入口から外へ出て始めてわけが解りました。昨夜のうちに、真白な雪がどっさり降ったのです。その雪の上からお陽さまがキラキラと照していたので、雪は眩しいほど反射していたのです。雪を知らなかった子供の狐は、あまり強い反射をうけたので、眼に何か刺さったと思ったのでした。`;
-
-
-
-const SAMPLE_TEXT_2 = `ルイズ！ルイズ！ルイズ！ルイズぅぅうううわぁああああああああああああああああああああああん！！！
-
-あぁああああ…ああ…あっあっー！あぁああああああ！！！ルイズルイズルイズぅううぁわぁああああ！！！
-
-あぁクンカクンカ！クンカクンカ！スーハースーハー！スーハースーハー！いい匂いだなぁ…くんくん
-
-んはぁっ！ルイズ・フランソワーズたんの桃色ブロンドの髪をクンカクンカしたいお！クンカクンカ！あぁあ！！
-
-間違えた！モフモフしたいお！モフモフ！モフモフ！髪髪モフモフ！カリカリモフモフ…きゅんきゅんきゅい！！
-
-小説12巻のルイズたんかわいかったよぅ！！あぁぁああ…あああ…あっあぁああ！ふぁぁあああんんっ！！
-
-コミック2巻はドグケインだよぅ！！にゃあぁああああああああああああああああああああああああ！`;
-
-
-
-const SAMPLE_TEXT_3 = `銀河鉄道の夜
-
-宮沢賢治
-
-
-
-「ではみなさんは、そういうふうに川だと云われたり、乳の流れたあとだと云われたりしていたこのぼんやりと白いものがほんとうは何かご承知ですか。」先生は、黒板に吊した大きな黒い星座の図の、上から下へ白くけぶった銀河帯のようなところを指しながら、みんなに問をかけました。
-
-カムパネルラが手をあげました。それから四、五人手をあげました。ジョバンニも手をあげようとして、急いでそのままやめました。たしかにあれはみんな星だと、いつか雑誌で読んだのでしたが、このごろはジョバンニはまるで毎日教室でもねむく、本を読むひまも読む本もないので、なんだかどんなこともよくわからないという気がするのでした。`;
-
+/**
+ * 外部ファイルからテキストを読み込む
+ * @param {string} filename - 読み込むファイル名（publicフォルダ内）
+ * @returns {Promise<string>} - ファイルの内容
+ */
+async function loadTextFromFile(filename) {
+  try {
+    const baseUrl = import.meta.env.BASE_URL;
+    const path = `${baseUrl}${filename}`.replace(/\/\/+/g, '/');
+    console.log(`Fetching text from: ${path}`);
+    const response = await fetch(path);
+    if (!response.ok) {
+      throw new Error(`Failed to load ${filename}: ${response.status} ${response.statusText}`);
+    }
+    return await response.text();
+  } catch (error) {
+    console.error(`Error loading ${filename}:`, error);
+    return '';
+  }
+}
 
 
 // --- トラップテキスト定義 ---
@@ -55,27 +34,17 @@ const SAMPLE_TEXT_3 = `銀河鉄道の夜
 const TRAP_BURBON_HOUSE = `
 
 　　　 ∧＿＿∧　やあ
-
 　　 （´・ω・｀)　　　　　 /
-
 　　／::∇y:::::＼　　　[￣￣]
-
   |:::⊃:|:::::|      |──|
 
 ￣￣￣￣￣￣￣￣￣￣￣￣￣￣￣￣￣|
-
 ￣￣￣￣￣￣￣￣￣￣￣￣￣￣ |￣￣
-
 ￣￣￣￣￣￣￣￣￣￣￣￣￣￣ |
-
 　　　　∇　∇　∇　∇　  ／ |
-
 　　　　┴　┴　┴　┴　／ ／|
-
 ￣￣￣￣￣￣￣￣￣￣￣￣|／　|
-
 ￣￣￣￣￣￣￣￣￣￣￣￣　　 |
-
 　　(⊆⊇)　(⊆⊇)　(⊆⊇)　 |
 
   　||　　　||　　　||　　 |
@@ -128,41 +97,41 @@ export default function App() {
 
   // UI表示用
 
-  const [inputText, setInputText] = useState(SAMPLE_TEXT_1);
+  const [inputText, setInputText] = useState('');
 
   const [words, setWords] = useState([]);
 
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const [wpm, setWpm] = useState(300); 
+  const [wpm, setWpm] = useState(300);
 
-  const [groupingMode, setGroupingMode] = useState('bunsetsu'); 
+  const [groupingMode, setGroupingMode] = useState('bunsetsu');
 
   const [maxCharLength, setMaxCharLength] = useState(4);
 
-  
+
 
   // ★ テーマ管理
 
-  const [theme, setTheme] = useState('modern'); 
+  const [theme, setTheme] = useState('modern');
 
-  
+
 
   const [showTrap, setShowTrap] = useState(false);
 
-  const [trapContent, setTrapContent] = useState(''); 
+  const [trapContent, setTrapContent] = useState('');
 
-  
+
 
   // ★ カウンター: 固定値
 
   const [hitCount] = useState(373737);
 
-  
 
-  const [elapsedTime, setElapsedTime] = useState(0); 
 
-  
+  const [elapsedTime, setElapsedTime] = useState(0);
+
+
 
   const [updateCounter, setUpdateCounter] = useState(0); // 強制更新用
 
@@ -176,19 +145,19 @@ export default function App() {
 
   // ロジック制御用 Ref
 
-  const nextWordTimeRef = useRef(0); 
+  const nextWordTimeRef = useRef(0);
 
-  const indexRef = useRef(0); 
+  const indexRef = useRef(0);
 
-  const wordsRef = useRef([]); 
+  const wordsRef = useRef([]);
 
-  const wpmRef = useRef(wpm); 
+  const wpmRef = useRef(wpm);
 
-  const startTimeRef = useRef(0); 
+  const startTimeRef = useRef(0);
 
-  const accumulatedTimeRef = useRef(0); 
+  const accumulatedTimeRef = useRef(0);
 
-  
+
 
   // ★ 確実な停止制御のためのRef
 
@@ -202,7 +171,7 @@ export default function App() {
 
   useEffect(() => { wpmRef.current = wpm; }, [wpm]);
 
-  
+
 
   // ★ isPlayingの状態をRefに常に同期させる
 
@@ -212,7 +181,7 @@ export default function App() {
 
   }, [isPlaying]);
 
-  
+
 
   // =================================================================
 
@@ -226,7 +195,7 @@ export default function App() {
 
     if (!isPlaying) {
 
-      return; 
+      return;
 
     }
 
@@ -248,7 +217,7 @@ export default function App() {
 
       if (!isPlayingRef.current) {
 
-        return; 
+        return;
 
       }
 
@@ -262,11 +231,11 @@ export default function App() {
 
       }
 
-      
+
 
       const currentWpm = wpmRef.current;
 
-      const currentWords = wordsRef.current; 
+      const currentWords = wordsRef.current;
 
       const intervalMs = 60000 / currentWpm;
 
@@ -276,7 +245,7 @@ export default function App() {
 
       const totalElapsedTime = accumulatedTimeRef.current + (timestamp - startTimeRef.current);
 
-      setElapsedTime(totalElapsedTime / 1000); 
+      setElapsedTime(totalElapsedTime / 1000);
 
 
 
@@ -296,7 +265,7 @@ export default function App() {
 
         const nextIndex = indexRef.current + 1;
 
-        
+
 
         if (nextIndex < currentWords.length) {
 
@@ -306,41 +275,41 @@ export default function App() {
 
           nextWordTimeRef.current += intervalMs;
 
-          
+
 
           // 遅延補正: ブラウザバックグラウンドなどで時間が飛びすぎていたら現在時刻に同期
 
           if (timestamp > nextWordTimeRef.current + intervalMs) {
 
-              nextWordTimeRef.current = timestamp + intervalMs;
+            nextWordTimeRef.current = timestamp + intervalMs;
 
           }
 
         } else {
 
-           // 最後まで到達したら停止処理
+          // 最後まで到達したら停止処理
 
-           setIsPlaying(false);
+          setIsPlaying(false);
 
-           // Refも更新しておく（useEffectの同期を待たずに即時反映するため）
+          // Refも更新しておく（useEffectの同期を待たずに即時反映するため）
 
-           isPlayingRef.current = false;
+          isPlayingRef.current = false;
 
-           indexRef.current = 0;
+          indexRef.current = 0;
 
-           accumulatedTimeRef.current = 0; 
+          accumulatedTimeRef.current = 0;
 
-           setElapsedTime(0);
+          setElapsedTime(0);
 
-           setUpdateCounter(c => c + 1);
+          setUpdateCounter(c => c + 1);
 
-           return; // ここでリターンしてループ終了
+          return; // ここでリターンしてループ終了
 
         }
 
       }
 
-      
+
 
       // 次のフレームを予約
 
@@ -364,7 +333,7 @@ export default function App() {
 
       cancelAnimationFrame(animationFrameId);
 
-      
+
 
       // 経過時間を保存して、開始時間をリセット
 
@@ -390,7 +359,7 @@ export default function App() {
 
     if (words.length > 0 && indexRef.current < words.length && !isPlaying) {
 
-      startTimeRef.current = 0; 
+      startTimeRef.current = 0;
 
       setIsPlaying(true);
 
@@ -414,13 +383,13 @@ export default function App() {
 
     const newIndex = parseInt(e.target.value, 10);
 
-    indexRef.current = newIndex; 
+    indexRef.current = newIndex;
 
-    accumulatedTimeRef.current = 0; 
+    accumulatedTimeRef.current = 0;
 
     setElapsedTime(0);
 
-    setUpdateCounter(c => c + 1); 
+    setUpdateCounter(c => c + 1);
 
   };
 
@@ -428,125 +397,241 @@ export default function App() {
 
   // --- テキスト解析 ---
 
+  // --- テキスト解析 ---
+
+  const [tokenizer, setTokenizer] = useState(null);
+  const [isTokenizerLoading, setIsTokenizerLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingStatus, setLoadingStatus] = useState('初期化中...');
+
+  // ★ Kuromojiの初期化 (プリロード付き)
   useEffect(() => {
+    const DICT_FILES = [
+      'base.dat.gz', 'check.dat.gz', 'tid.dat.gz', 'tid_pos.dat.gz', 'tid_map.dat.gz',
+      'cc.dat.gz', 'unk.dat.gz', 'unk_pos.dat.gz', 'unk_map.dat.gz',
+      'unk_char.dat.gz', 'unk_compat.dat.gz', 'unk_invoke.dat.gz'
+    ];
 
-    if (!inputText) {
+    const preloadDictionary = async () => {
+      setLoadingStatus('辞書データをダウンロード中...');
+      let loadedCount = 0;
+      const totalFiles = DICT_FILES.length;
+      const baseUrl = import.meta.env.BASE_URL + 'dict/';
 
+      try {
+        console.log('Dictionary Base URL:', baseUrl);
+        // path shimの確認
+        try {
+          const path = await import('path');
+          console.log('Path module loaded:', path);
+        } catch (e) {
+          console.error('Failed to load path module:', e);
+        }
+
+        // 順次ダウンロード (並列だとエラーが起きやすい場合があるため)
+        for (const file of DICT_FILES) {
+          try {
+            const response = await fetch(baseUrl + file);
+            console.log(`[Preload] ${file} - Status: ${response.status}, Content-Type: ${response.headers.get('Content-Type')}`);
+
+            if (!response.ok) throw new Error(`Status ${response.status}`);
+
+            // キャッシュさせるためにblobとして取得
+            await response.blob();
+
+            loadedCount++;
+            setLoadingProgress(Math.floor((loadedCount / totalFiles) * 100));
+          } catch (e) {
+            throw new Error(`${file}: ${e.message}`);
+          }
+        }
+
+        setLoadingStatus('辞書を構築中...');
+
+        // ダウンロード完了後にKuromojiを構築
+        const builder = kuromoji.builder({
+          dicPath: baseUrl
+        });
+
+        builder.build((err, _tokenizer) => {
+          if (err) {
+            console.error('Kuromoji initialization failed:', err);
+            setLoadingStatus(`辞書の構築に失敗しました: ${err.message}`);
+            return;
+          }
+          console.log('Kuromoji initialized');
+          setTokenizer(_tokenizer);
+          setIsTokenizerLoading(false);
+        });
+
+      } catch (error) {
+        console.error('Dictionary preload failed:', error);
+        setLoadingStatus(`辞書のダウンロードに失敗しました: ${error.message} (URL: ${baseUrl})`);
+      }
+    };
+
+    preloadDictionary();
+  }, []);
+
+
+  // --- テキスト解析 ---
+
+  useEffect(() => {
+    if (!inputText || !tokenizer) {
       setWords([]);
-
       return;
-
     }
 
     // 入力が変わったら停止
-
     setIsPlaying(false);
-
     isPlayingRef.current = false;
 
-    
-
     try {
+      const tokens = tokenizer.tokenize(inputText);
 
-      if (typeof Intl.Segmenter !== 'function') throw new Error("Intl.Segmenter not supported");
+      // カスタム単語の結合処理 (カムパネルラなど)
+      // Kuromojiのトークン列を走査して、カスタム単語が含まれていれば結合する
+      const CUSTOM_WORDS = ['カムパネルラ'];
 
-      const segmenter = new Intl.Segmenter('ja-JP', { granularity: 'word' });
+      // トークンを結合しやすい形に変換
+      let processedTokens = tokens.map(t => ({
+        surface: t.surface_form,
+        pos: t.pos,
+        pos_detail_1: t.pos_detail_1
+      }));
 
-      const rawSegments = Array.from(segmenter.segment(inputText)).map(s => s.segment);
+      // カスタム単語結合ロジック
+      // 単純化のため、一度文字列に戻してインデックスを探すのではなく、
+      // トークン列の中でカスタム単語を構成する並びを見つけて結合する
+      // しかし、Kuromojiの区切りとカスタム単語が一致しない場合（部分一致など）が難しい。
+      // ここでは、前のロジックと同様に「文字列上の位置」で判定して、該当するトークンをマージするアプローチをとる。
 
-      let processedWords = [];
+      // 1. 各トークンの開始位置を計算
+      let currentPos = 0;
+      processedTokens.forEach(t => {
+        t.start = currentPos;
+        t.end = currentPos + t.surface.length;
+        currentPos += t.surface.length;
+      });
+
+      // 2. カスタム単語の範囲を特定
+      const customWordRanges = [];
+      CUSTOM_WORDS.forEach(word => {
+        let pos = inputText.indexOf(word);
+        while (pos !== -1) {
+          customWordRanges.push({ start: pos, end: pos + word.length, word });
+          pos = inputText.indexOf(word, pos + 1);
+        }
+      });
+      customWordRanges.sort((a, b) => a.start - b.start);
+
+      // 3. カスタム単語範囲に含まれるトークンを結合
+      if (customWordRanges.length > 0) {
+        let newTokens = [];
+        let i = 0;
+        while (i < processedTokens.length) {
+          const t = processedTokens[i];
+          // このトークンがカスタム単語の範囲と重なっているか（開始位置で判定）
+          const range = customWordRanges.find(r => r.start <= t.start && t.end <= r.end);
+
+          if (range) {
+            // カスタム単語の開始トークンであれば、その単語全体を追加
+            if (t.start === range.start) {
+              newTokens.push({
+                surface: range.word,
+                pos: '名詞', // カスタム単語は名詞扱いとする
+                pos_detail_1: '固有名詞'
+              });
+              // 範囲内の後続トークンをスキップ
+              let j = i + 1;
+              while (j < processedTokens.length) {
+                if (processedTokens[j].end <= range.end) {
+                  j++;
+                } else {
+                  break;
+                }
+              }
+              i = j;
+            } else {
+              // 範囲の途中から始まるトークンはスキップ（先頭で処理済みのはずだが念のため）
+              i++;
+            }
+          } else {
+            newTokens.push(t);
+            i++;
+          }
+        }
+        processedTokens = newTokens;
+      }
+
+      let finalWords = [];
 
       if (groupingMode === 'word') {
-
-        processedWords = rawSegments.filter(s => s.trim().length > 0);
-
+        // 単語モード: そのまま表示（空白は除外）
+        finalWords = processedTokens.map(t => t.surface).filter(s => s.trim().length > 0);
       } else {
+        // 文節モード: POSタグに基づく結合
+        // ルール: 
+        // 自立語（名詞、動詞、形容詞など）は新しい文節の開始
+        // 付属語（助詞、助動詞）は前の文節にくっつく
+        // 接尾辞も前にくっつく
+        // 記号は、開き括弧なら次へ、閉じ括弧・句読点なら前へ
 
         let buffer = "";
 
-        const isClosingChars = (str) => /^[、。,.?!！？」』)）>\]}】]+$/.test(str.trim());
-
-        const isOpenChars = (str) => /^[「『(（<\[{【]+$/.test(str.trim());
-
-        const isConnector = (str) => /^([ぁ-んー]+|[、。,.?!！？」』)）>\]}】]+)$/.test(str.trim());
-
-
-
-        rawSegments.forEach((seg) => {
-
-          const s = seg.trim();
-
-          if (s.length === 0) return;
-
-          if (buffer === "") {
-
-            buffer = s;
-
-          } else {
-
-            const willExceedLimit = (buffer.length + s.length) > maxCharLength;
-
-            const isNextClosing = isClosingChars(s);
-
-            const isNextConnector = isConnector(s);
-
-            const bufferIsOnlyOpenChars = isOpenChars(buffer);
-
-            const isNextOpenChar = isOpenChars(s); 
-
-            if (isNextClosing) {
-
-              buffer += s;
-
-            } else if (bufferIsOnlyOpenChars) {
-
-               buffer += s;
-
-            } else if (isNextOpenChar) {
-
-               processedWords.push(buffer);
-
-               buffer = s;
-
-            } else if (isNextConnector && !willExceedLimit) {
-
-              buffer += s;
-
-            } else {
-
-              processedWords.push(buffer);
-
-              buffer = s;
-
-            }
-
+        const isIndependent = (token) => {
+          const pos = token.pos;
+          const pos1 = token.pos_detail_1;
+          if (pos === '助詞' || pos === '助動詞') return false;
+          if (pos === '接尾辞') return false;
+          if (pos === '記号') {
+            // 開き括弧系は独立（というか次の自立語にくっつけたいが、ここではバッファフラッシュのトリガーにする）
+            if (/^[「『(（<\[{【]/.test(token.surface)) return true;
+            return false; // それ以外の記号（句読点など）は付属扱い
           }
+          return true;
+        };
 
+        processedTokens.forEach((token) => {
+          if (buffer === "") {
+            buffer = token.surface;
+          } else {
+            if (isIndependent(token)) {
+              // 自立語が来たので、前のバッファを確定させる
+              // ただし、バッファが開き括弧のみの場合は結合する
+              if (/^[「『(（<\[{【]+$/.test(buffer)) {
+                buffer += token.surface;
+              } else {
+                finalWords.push(buffer);
+                buffer = token.surface;
+              }
+            } else {
+              // 付属語なのでくっつける
+              // ただし、長くなりすぎる場合は切る（maxCharLength考慮）
+              if (buffer.length + token.surface.length > maxCharLength * 2) { // 許容範囲を少し広めに
+                finalWords.push(buffer);
+                buffer = token.surface;
+              } else {
+                buffer += token.surface;
+              }
+            }
+          }
         });
-
-        if (buffer) processedWords.push(buffer);
-
+        if (buffer) finalWords.push(buffer);
       }
 
-      setWords(processedWords);
-
+      setWords(finalWords);
       indexRef.current = 0;
-
-      accumulatedTimeRef.current = 0; 
-
+      accumulatedTimeRef.current = 0;
       setElapsedTime(0);
-
-      setUpdateCounter(c => c + 1); 
+      setUpdateCounter(c => c + 1);
 
     } catch (e) {
-
-      console.warn("Segmentation failed, falling back to simple split:", e);
-
-      setWords(inputText.split(/[\s　]+/)); 
-
+      console.warn("Segmentation failed:", e);
+      setWords(inputText.split(/[\s　]+/));
     }
 
-  }, [inputText, groupingMode, maxCharLength]);
+  }, [inputText, groupingMode, maxCharLength, tokenizer]);
 
 
 
@@ -554,13 +639,27 @@ export default function App() {
 
   // --- UI操作ヘルパー ---
 
-  const loadSampleText = (text) => {
+  // 初期ロード時にサンプルテキスト1を読み込む
+  useEffect(() => {
+    const loadInitialText = async () => {
+      const text = await loadTextFromFile('sample_text_1.txt');
+      if (text) {
+        setInputText(text);
+      }
+    };
+    loadInitialText();
+  }, []);
+
+  const loadSampleText = async (filename) => {
 
     setIsPlaying(false);
 
     isPlayingRef.current = false;
 
-    setInputText(text);
+    const text = await loadTextFromFile(filename);
+    if (text) {
+      setInputText(text);
+    }
 
   };
 
@@ -602,7 +701,7 @@ export default function App() {
 
   const RetroButton = ({ onClick, children, className = "", disabled = false }) => (
 
-    <button 
+    <button
 
       onClick={onClick}
 
@@ -644,15 +743,37 @@ export default function App() {
 
     if (!word) {
 
-        if (theme === 'modern') return <div className="text-gray-400 font-sans">Waiting...</div>;
+      if (theme === 'modern') return <div className="text-gray-400 font-sans">Waiting...</div>;
 
-        return <div className="text-[#00ff00] animate-pulse font-mono">Waiting for data...</div>;
+      return <div className="text-[#00ff00] animate-pulse font-mono">Waiting for data...</div>;
 
     }
 
 
 
-    const centerIndex = Math.max(0, Math.floor(word.length / 2));
+    // 句読点・記号を除外して中心を計算
+    // 末尾の句読点や括弧を除外
+    const trailingPunctuationRegex = /[。、！？」』）】,.!?)\]}>]+$/;
+    // 先頭の開き括弧を除外
+    const leadingPunctuationRegex = /^[「『（【\[{(<]+/;
+
+    // 有効な文字列（句読点を除外した部分）を取得
+    let effectiveWord = word.replace(trailingPunctuationRegex, '').replace(leadingPunctuationRegex, '');
+
+    // 有効な文字列が空の場合は元の単語を使用
+    if (effectiveWord.length === 0) {
+      effectiveWord = word;
+    }
+
+    // 有効な文字列の開始位置を計算
+    const leadingMatch = word.match(leadingPunctuationRegex);
+    const leadingLength = leadingMatch ? leadingMatch[0].length : 0;
+
+    // 有効な文字列の中心インデックスを計算
+    const effectiveCenterIndex = Math.floor(effectiveWord.length / 2);
+
+    // 元の文字列における実際の中心位置
+    const centerIndex = leadingLength + effectiveCenterIndex;
 
     const pre = word.slice(0, centerIndex);
 
@@ -674,7 +795,7 @@ export default function App() {
 
           <span className="text-slate-600">{post}</span>
 
-          
+
 
           <div className="absolute top-[-10px] left-1/2 w-[3px] h-[8px] bg-rose-300 rounded-full transform -translate-x-1/2 opacity-60"></div>
 
@@ -780,7 +901,7 @@ export default function App() {
 
         <div className="marquee-text">
 
-          ★☆★ ようこそバーサナ技術開発局へ！！ ★☆★ キリ番{hitCount}踏んだ人はBBSにカキコしてね！！ ★☆★ 踏み逃げ厳禁！！
+          ★☆★ ようこそバーサナ技術開発部へ！！ ★☆★ キリ番{hitCount}踏んだ人はBBSにカキコしてね！！ ★☆★ 踏み逃げ厳禁！！
 
         </div>
 
@@ -790,39 +911,37 @@ export default function App() {
 
       <div className="max-w-[800px] mx-auto p-2 bg-white/90 border-4 border-double border-[#ff69b4] shadow-[5px_5px_0px_0px_rgba(255,105,180,0.5)] relative z-10">
 
-        
+
 
         {/* タイトルバナー */}
 
         <div className="text-center bg-[#ffe4e1] border-2 border-dashed border-[#ff1493] p-4 mb-4">
 
           <h1 className="text-4xl font-bold text-[#ff1493] drop-shadow-[2px_2px_0px_#ffffff] mb-2 flex justify-center items-center gap-2 flex-wrap">
-
             <span role="img" aria-label="Eggplant emoji" className="text-2xl">🍆</span>
-
             凝視リーダー
-
             <span role="img" aria-label="Tiger emoji" className="text-2xl">🐯</span>
-
           </h1>
-
           <p className="text-xs text-[#ff0000] font-bold blink">
-
-            Wait a moment... Loading... Now Loading...
-
+            {isTokenizerLoading ? loadingStatus : "Wait a moment... Loading... Now Loading..."}
           </p>
-
+          {isTokenizerLoading && (
+            <div className="w-full max-w-xs mx-auto mt-2">
+              <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 border border-gray-400">
+                <div
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${loadingProgress}%` }}
+                ></div>
+              </div>
+              <div className="text-center text-xs text-blue-600 font-bold mt-1">
+                {loadingProgress}%
+              </div>
+            </div>
+          )}
         </div>
 
-
-
         {/* 2カラムレイアウト */}
-
         <div className="flex flex-col md:flex-row gap-2">
-
-          
-
-          {/* 左サイドバー (Menu) */}
 
           <div className="w-full md:w-48 bg-[#fff0f5] border-2 border-inset border-[#ff69b4] p-2 text-center h-fit shrink-0">
 
@@ -840,7 +959,7 @@ export default function App() {
 
               ))}
 
-              
+
 
               {/* Linkメニュー (クリックで展開) */}
 
@@ -850,7 +969,7 @@ export default function App() {
 
               </li>
 
-              
+
 
               {/* 展開されるリンク集 */}
 
@@ -884,7 +1003,7 @@ export default function App() {
 
             </ul>
 
-            
+
 
             <div className="mt-4 mb-2">
 
@@ -934,7 +1053,7 @@ export default function App() {
 
               relative h-40 flex items-center justify-center overflow-hidden mb-4 shadow-inner transition-all
 
-              ${theme === 'modern' 
+              ${theme === 'modern'
 
                 ? 'bg-white border-2 border-gray-200 rounded-2xl shadow-sm'
 
@@ -950,11 +1069,11 @@ export default function App() {
 
               )}
 
-              
+
 
               {renderRsvpWord()}
 
-              
+
 
               <div className={`
 
@@ -986,21 +1105,21 @@ export default function App() {
 
               </div>
 
-              
+
 
               <div className="p-2 flex flex-col gap-2">
 
                 <div className="relative">
 
-                  <input 
+                  <input
 
-                    type="range" 
+                    type="range"
 
-                    min="0" 
+                    min="0"
 
-                    max={words.length > 0 ? words.length - 1 : 0} 
+                    max={words.length > 0 ? words.length - 1 : 0}
 
-                    value={indexRef.current} 
+                    value={indexRef.current}
 
                     onChange={handleProgressChange}
 
@@ -1016,7 +1135,7 @@ export default function App() {
 
                 </div>
 
-                
+
 
                 <div className="flex justify-center items-center flex-wrap gap-2 mt-1">
 
@@ -1032,11 +1151,11 @@ export default function App() {
 
                   </div>
 
-                  
+
 
                   <div className="flex items-center gap-2 bg-white border border-gray-500 px-2 py-1 shadow-inner">
 
-                    <span className="text-xs font-mono">SPD:</span>
+                    <span className="text-xs font-mono">WPM:</span>
 
                     <span className="text-sm font-bold font-mono text-red-600 w-8 text-right">{wpm}</span>
 
@@ -1062,7 +1181,7 @@ export default function App() {
 
                   <span>ヽ(´ー｀)ノﾏﾀｰﾘ</span>
 
-                  <input 
+                  <input
 
                     type="range" min="100" max="1000" step="25"
 
@@ -1084,7 +1203,7 @@ export default function App() {
 
                 <legend className="text-[#ff1493] font-bold px-1">表示設定</legend>
 
-                
+
 
                 <div className="mb-3 pb-3 border-b border-dashed border-gray-400">
 
@@ -1094,17 +1213,15 @@ export default function App() {
 
                     <label className="cursor-pointer flex items-center gap-1">
 
-                      <input 
+                      <input
 
-                        type="radio" 
+                        type="radio"
 
-                        checked={theme === 'retro'} 
+                        checked={theme === 'retro'}
 
-                        onChange={() => setTheme('retro')} 
+                        onChange={() => setTheme('retro')}
 
                       />
-
-                      <Monitor size={12} className="text-gray-600"/>
 
                       レトロ
 
@@ -1112,17 +1229,15 @@ export default function App() {
 
                     <label className="cursor-pointer flex items-center gap-1">
 
-                      <input 
+                      <input
 
-                        type="radio" 
+                        type="radio"
 
-                        checked={theme === 'modern'} 
+                        checked={theme === 'modern'}
 
-                        onChange={() => setTheme('modern')} 
+                        onChange={() => setTheme('modern')}
 
                       />
-
-                      <Type size={12} className="text-blue-500"/>
 
                       モダン(丸ゴシック)
 
@@ -1142,13 +1257,13 @@ export default function App() {
 
                     <label className="cursor-pointer flex items-center gap-1">
 
-                      <input 
+                      <input
 
-                        type="radio" 
+                        type="radio"
 
-                        checked={groupingMode === 'word'} 
+                        checked={groupingMode === 'word'}
 
-                        onChange={() => setGroupingMode('word')} 
+                        onChange={() => setGroupingMode('word')}
 
                       />
 
@@ -1158,13 +1273,13 @@ export default function App() {
 
                     <label className="cursor-pointer flex items-center gap-1">
 
-                      <input 
+                      <input
 
-                        type="radio" 
+                        type="radio"
 
-                        checked={groupingMode === 'bunsetsu'} 
+                        checked={groupingMode === 'bunsetsu'}
 
-                        onChange={() => setGroupingMode('bunsetsu')} 
+                        onChange={() => setGroupingMode('bunsetsu')}
 
                       />
 
@@ -1180,11 +1295,11 @@ export default function App() {
 
                       <span>1回あたりの最大文字数(長い単語は強制表示するよ): {maxCharLength}</span>
 
-                      <input 
+                      <input
 
-                        type="range" min="2" max="15" 
+                        type="range" min="2" max="15"
 
-                        value={maxCharLength} 
+                        value={maxCharLength}
 
                         onChange={(e) => setMaxCharLength(Number(e.target.value))}
 
@@ -1200,11 +1315,11 @@ export default function App() {
 
               </fieldset>
 
-              
+
 
               <div className="mt-3 pt-3 border-t border-dashed border-gray-400 text-[#333333]">
 
-                  
+
               </div>
 
 
@@ -1215,11 +1330,13 @@ export default function App() {
 
             <div className="mb-2 flex flex-wrap gap-1">
 
-              <RetroButton onClick={() => loadSampleText(SAMPLE_TEXT_1)}>手袋を買いに</RetroButton>
+              <RetroButton onClick={() => loadSampleText('sample_text_1.txt')}>手袋を買いに</RetroButton>
 
-              <RetroButton onClick={() => loadSampleText(SAMPLE_TEXT_3)}>銀河鉄道の夜</RetroButton>
+              <RetroButton onClick={() => loadSampleText('sample_text_3.txt')}>銀河鉄道の夜</RetroButton>
 
-              <RetroButton onClick={() => loadSampleText(SAMPLE_TEXT_2)}>ルイズコピペ</RetroButton>
+              <RetroButton onClick={() => loadSampleText('sample_text_2.txt')}>ルイズコピペ</RetroButton>
+
+              <RetroButton onClick={() => loadSampleText('sample_text_4.txt')}>堕落論</RetroButton>
 
             </div>
 
@@ -1249,9 +1366,9 @@ export default function App() {
 
             <div className="flex flex-col md:flex-row justify-center items-center gap-4 my-6 p-4 bg-white/40 rounded-xl backdrop-blur-sm border border-white/50">
 
-              <div className="text-left font-['MS_PGothic','Osaka',sans-serif] text-xs leading-[1.1] whitespace-pre overflow-x-auto shrink-0 opacity-90 text-gray-800">
+              <div className="text-left font-['MS_PGothic','Osaka',sans-serif] text-xs leading-[0.5] whitespace-pre overflow-x-auto shrink-0 opacity-90 text-gray-800">
 
-{`
+                {`
 
  　　　 　　／⌒ヽ
 
@@ -1279,23 +1396,23 @@ export default function App() {
 
               </div>
 
-              
+
 
               <div className="text-xs text-[#333] max-w-lg font-sans leading-relaxed">
 
                 <strong className="inline-block mb-1 text-[#ff1493] border-b border-[#ff1493]">★ RSVP（Rapid Serial Visual Presentation）とは？</strong>
 
-                <br/>
+                <br />
 
                 画面の定位置に単語を高速で連続表示する技術です。
 
-                通常の読書で発生する「眼球移動（サッケード）」の時間を極限まで削減し、
+                通常の読書で発生する眼球移動（サッケード）の時間を極限まで削減し、
 
                 視線を固定したまま情報を脳へ直接インプットします。
 
-                慣れれば分速1000文字以上の「凝視読書」も可能。
+                慣れれば分速1000文字以上の長速読も可能なんだって。すごいねー。
 
-                <br/>
+                <br />
 
               </div>
 
@@ -1307,7 +1424,7 @@ export default function App() {
 
         </div>
 
-        
+
 
         {/* 著作権表示の変更 */}
 
@@ -1325,23 +1442,23 @@ export default function App() {
 
       {showTrap && (
 
-        <div 
+        <div
 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 font-mono text-white p-4" 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 font-mono text-white p-4"
 
           onClick={() => setShowTrap(false)}
 
         >
 
-          <div 
+          <div
 
-            className="max-w-2xl bg-black border-4 border-double border-white p-8 whitespace-pre-wrap leading-relaxed relative text-center shadow-[0_0_15px_rgba(255,255,255,0.7)]" 
+            className="max-w-2xl bg-black border-4 border-double border-white p-8 whitespace-pre-wrap leading-relaxed relative text-center shadow-[0_0_15px_rgba(255,255,255,0.7)]"
 
             onClick={(e) => e.stopPropagation()}
 
           >
 
-            <button 
+            <button
 
               className="absolute top-2 right-2 text-white hover:text-red-500"
 
@@ -1357,7 +1474,7 @@ export default function App() {
 
             <div className={`text-sm mb-4 text-red-500`}>
 
-              <pre className="font-['MS_PGothic','Osaka',sans-serif] text-left overflow-x-auto leading-[1.1] whitespace-pre">{TRAP_BURBON_HOUSE.trim()}</pre>
+              <pre className="font-['MS_PGothic','Osaka',sans-serif] text-left overflow-x-auto leading-[0.5] whitespace-pre">{TRAP_BURBON_HOUSE.trim()}</pre>
 
             </div>
 
