@@ -1,3 +1,10 @@
+// zlibjs を明示的にインポートしてグローバルで利用可能にする
+// kuromoji が require("zlibjs/bin/gunzip.min.js") で使用するため
+import * as zlibjs from 'zlibjs/bin/gunzip.min.js';
+if (typeof window !== 'undefined') {
+    window.Zlib = zlibjs.Zlib;
+}
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'

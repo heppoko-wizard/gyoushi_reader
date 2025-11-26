@@ -37,11 +37,12 @@ export default defineConfig({
   resolve: {
     alias: {
       path: 'path-browserify',
+      'zlibjs/bin/gunzip.min.js': 'zlibjs/bin/gunzip.min.js',
     },
   },
   base: '/gyoushi_reader/',
   optimizeDeps: {
-    include: ['kuromoji', 'zlibjs'],
+    include: ['kuromoji', 'zlibjs/bin/gunzip.min.js'],
   },
   build: {
     commonjsOptions: {
@@ -52,6 +53,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           kuromoji: ['kuromoji'],
+          zlibjs: ['zlibjs/bin/gunzip.min.js'],
         },
       },
     },
