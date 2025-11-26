@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import kuromoji from 'kuromoji';
+import { loadDefaultJapaneseParser } from 'budoux';
 
 import { Play, X, Settings, Monitor, Type } from 'lucide-react';
 
@@ -400,135 +400,18 @@ export default function App() {
 
   // --- テキスト解析 ---
 
-  const [tokenizer, setTokenizer] = useState(null);
-  const [isTokenizerLoading, setIsTokenizerLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const [loadingStatus, setLoadingStatus] = useState('初期化中...');
-
-  // ★ Kuromojiの初期化 (ZIP解凍方式)
-  useEffect(() => {
-    console.log('🚀 [INIT] App component mounted - Starting initialization');
-    console.log('📍 [ENV] BASE_URL:', import.meta.env.BASE_URL);
-    console.log('📍 [ENV] MODE:', import.meta.env.MODE);
-    console.log('📍 [ENV] PROD:', import.meta.env.PROD);
-
-    const loadDictionaryFromZip = async () => {
-      console.log('📚 [DICT] Starting dictionary load from ZIP');
-      setLoadingStatus('辞書データをダウンロード中...');
-      const baseUrl = import.meta.env.BASE_URL;
-
-      try {
-        // JSZipをインポート
-        console.log('📦 [ZIP] Loading JSZip library...');
-        const JSZip = (await import('jszip')).default;
-        console.log('✅ [ZIP] JSZip loaded');
-
-        // ZIPファイルをダウンロード
-        const zipUrl = `${baseUrl}dict/dic.zip`;
-        console.log('⬇️ [ZIP] Downloading:', zipUrl);
-        setLoadingStatus('辞書ZIPファイルをダウンロード中...');
-
-        const response = await fetch(zipUrl);
-        if (!response.ok) {
-          throw new Error(`Failed to download dic.zip: ${response.status} ${response.statusText}`);
-        }
-
-        const zipBlob = await response.blob();
-        console.log(`✅ [ZIP] Downloaded (${zipBlob.size} bytes)`);
-        setLoadingProgress(30);
-
-        // ZIPファイルを解凍
-        console.log('📂 [ZIP] Extracting ZIP file...');
-        setLoadingStatus('辞書ファイルを解凍中...');
-        const zip = await JSZip.loadAsync(zipBlob);
-        console.log('✅ [ZIP] ZIP file loaded');
-        setLoadingProgress(50);
-
-        // 解凍したファイルをメモリに保存
-        console.log('💾 [ZIP] Extracting individual files...');
-        const files = {};
-        const fileNames = Object.keys(zip.files);
-        console.log(`📋 [ZIP] Found ${fileNames.length} files in ZIP`);
-
-        for (const fileName of fileNames) {
-          if (!zip.files[fileName].dir) {
-            console.log(`📄 [ZIP] Extracting: ${fileName}`);
-            const content = await zip.files[fileName].async('arraybuffer');
-            files[fileName] = new Uint8Array(content);
-            console.log(`✅ [ZIP] Extracted ${fileName} (${files[fileName].length} bytes)`);
-          }
-        }
-
-        setLoadingProgress(70);
-        console.log('✅ [ZIP] All files extracted successfully');
-
-        // Kuromojiビルダーを作成
-        console.log('🔨 [BUILD] Creating Kuromoji builder...');
-        setLoadingStatus('辞書を構築中...');
-
-        // カスタムローダーを使ってkuromojiに解凍済みデータを渡す
-        const builder = kuromoji.builder({
-          dicPath: baseUrl + 'dict/',
-        });
-
-        // kuromojiの内部ローダーを上書きして、解凍済みファイルを使用
-        const originalLoadArrayBuffer = builder.loadArrayBuffer;
-        builder.loadArrayBuffer = function (url, callback) {
-          console.log(`🔍 [LOADER] Kuromoji requested: ${url}`);
-
-          // URLからファイル名を抽出
-          const fileName = url.split('/').pop();
-
-          // .gzを除去したファイル名も試す
-          const fileNameWithoutGz = fileName.replace(/\.gz$/, '');
-
-          console.log(`🔍 [LOADER] Looking for: ${fileName} or ${fileNameWithoutGz}`);
-
-          if (files[fileName]) {
-            console.log(`✅ [LOADER] Found ${fileName} in extracted files`);
-            callback(null, files[fileName].buffer);
-          } else if (files[fileNameWithoutGz]) {
-            console.log(`✅ [LOADER] Found ${fileNameWithoutGz} in extracted files`);
-            callback(null, files[fileNameWithoutGz].buffer);
-          } else {
-            console.error(`❌ [LOADER] File not found: ${fileName} or ${fileNameWithoutGz}`);
-            console.error(`Available files:`, Object.keys(files));
-            callback(new Error(`File not found: ${fileName}`), null);
-          }
-        };
-
-        console.log('🔨 [BUILD] Building tokenizer...');
-        setLoadingProgress(80);
-
-        builder.build((err, _tokenizer) => {
-          if (err) {
-            console.error('❌ [BUILD] Kuromoji initialization failed:', err);
-            console.error('❌ [BUILD] Error details:', JSON.stringify(err, null, 2));
-            setLoadingStatus(`辞書の構築に失敗しました: ${err.message}`);
-            return;
-          }
-          console.log('✅ [BUILD] Kuromoji tokenizer initialized successfully!');
-          setTokenizer(_tokenizer);
-          setIsTokenizerLoading(false);
-          setLoadingProgress(100);
-          console.log('🎉 [INIT] Complete! Application is ready.');
-        });
-
-      } catch (error) {
-        console.error('❌ [ERROR] Dictionary load failed:', error);
-        console.error('❌ [ERROR] Error stack:', error.stack);
-        setLoadingStatus(`辞書の読み込みに失敗しました: ${error.message}`);
-      }
-    };
-
-    loadDictionaryFromZip();
-  }, []);
-
-
   // --- テキスト解析 ---
 
+  const [parser, setParser] = useState(null);
+
+  // BudouXの初期化
   useEffect(() => {
-    if (!inputText || !tokenizer) {
+    const p = loadDefaultJapaneseParser();
+    setParser(p);
+  }, []);
+
+  useEffect(() => {
+    if (!inputText) {
       setWords([]);
       return;
     }
@@ -538,34 +421,74 @@ export default function App() {
     isPlayingRef.current = false;
 
     try {
-      const tokens = tokenizer.tokenize(inputText);
+      let rawChunks = [];
+
+      // 単語分割用のSegmenter (共通で使用)
+      const segmenter = new Intl.Segmenter("ja-JP", { granularity: "word" });
+
+      if (groupingMode === 'word') {
+        // 単語モード: Intl.Segmenter
+        // segment() returns an iterable, convert to array of strings
+        rawChunks = Array.from(segmenter.segment(inputText)).map(s => s.segment).filter(s => s.trim().length > 0);
+      } else {
+        // 文節モード: BudouX
+        let initialChunks = [];
+        if (parser) {
+          initialChunks = parser.parse(inputText);
+        } else {
+          // パーサー未ロード時は簡易分割
+          initialChunks = inputText.split(/[\s　]+/);
+        }
+
+        // ★ 長さ制限ロジックの復活
+        // BudouXのチャンクが maxCharLength を超える場合、Intl.Segmenterでさらに細かく分割して再構成する
+        rawChunks = [];
+
+        initialChunks.forEach(chunk => {
+          if (chunk.length <= maxCharLength) {
+            rawChunks.push(chunk);
+          } else {
+            // 長すぎる場合、単語単位に分解
+            const words = Array.from(segmenter.segment(chunk)).map(s => s.segment);
+
+            let buffer = "";
+            words.forEach(word => {
+              // バッファに追加しても制限内なら追加
+              if ((buffer + word).length <= maxCharLength) {
+                buffer += word;
+              } else {
+                // 制限を超える場合
+                if (buffer.length > 0) {
+                  // 既存バッファをフラッシュ
+                  rawChunks.push(buffer);
+                  buffer = word;
+                } else {
+                  // バッファが空（つまり単語単体で制限を超えている）場合
+                  // 仕方ないのでその単語をそのまま出す（あるいは文字単位で切る手もあるが、一旦これで）
+                  rawChunks.push(word);
+                  buffer = "";
+                }
+              }
+            });
+            if (buffer.length > 0) {
+              rawChunks.push(buffer);
+            }
+          }
+        });
+      }
 
       // カスタム単語の結合処理 (カムパネルラなど)
-      // Kuromojiのトークン列を走査して、カスタム単語が含まれていれば結合する
       const CUSTOM_WORDS = ['カムパネルラ'];
 
-      // トークンを結合しやすい形に変換
-      let processedTokens = tokens.map(t => ({
-        surface: t.surface_form,
-        pos: t.pos,
-        pos_detail_1: t.pos_detail_1
-      }));
-
-      // カスタム単語結合ロジック
-      // 単純化のため、一度文字列に戻してインデックスを探すのではなく、
-      // トークン列の中でカスタム単語を構成する並びを見つけて結合する
-      // しかし、Kuromojiの区切りとカスタム単語が一致しない場合（部分一致など）が難しい。
-      // ここでは、前のロジックと同様に「文字列上の位置」で判定して、該当するトークンをマージするアプローチをとる。
-
-      // 1. 各トークンの開始位置を計算
+      // チャンクに位置情報を付与
       let currentPos = 0;
-      processedTokens.forEach(t => {
-        t.start = currentPos;
-        t.end = currentPos + t.surface.length;
-        currentPos += t.surface.length;
+      let chunkObjects = rawChunks.map(c => {
+        const obj = { surface: c, start: currentPos, end: currentPos + c.length };
+        currentPos += c.length;
+        return obj;
       });
 
-      // 2. カスタム単語の範囲を特定
+      // カスタム単語の範囲を特定
       const customWordRanges = [];
       CUSTOM_WORDS.forEach(word => {
         let pos = inputText.indexOf(word);
@@ -576,118 +499,47 @@ export default function App() {
       });
       customWordRanges.sort((a, b) => a.start - b.start);
 
-      // 3. カスタム単語範囲に含まれるトークンを結合
+      // 結合処理
       if (customWordRanges.length > 0) {
-        let newTokens = [];
+        let newChunks = [];
         let i = 0;
-        while (i < processedTokens.length) {
-          const t = processedTokens[i];
-          // このトークンがカスタム単語の範囲と重なっているか（開始位置で判定）
-          const range = customWordRanges.find(r => r.start <= t.start && t.end <= r.end);
+        while (i < chunkObjects.length) {
+          const c = chunkObjects[i];
+          // このチャンクがカスタム単語の範囲と重なっているか
+          const range = customWordRanges.find(r =>
+            (c.start >= r.start && c.start < r.end) ||
+            (c.end > r.start && c.end <= r.end) ||
+            (c.start <= r.start && c.end >= r.end)
+          );
 
           if (range) {
-            // カスタム単語の開始トークンであれば、その単語全体を追加
-            if (t.start === range.start) {
-              newTokens.push({
-                surface: range.word,
-                pos: '名詞', // カスタム単語は名詞扱いとする
-                pos_detail_1: '固有名詞'
-              });
-              // 範囲内の後続トークンをスキップ
-              let j = i + 1;
-              while (j < processedTokens.length) {
-                if (processedTokens[j].end <= range.end) {
-                  j++;
-                } else {
-                  break;
-                }
+            // 範囲の開始を含むチャンクから、範囲の終了を含むチャンクまでを探す
+            let mergedSurface = c.surface;
+            let j = i + 1;
+
+            while (j < chunkObjects.length) {
+              const nextC = chunkObjects[j];
+              // 次のチャンクもこのrangeと被っているか？
+              // (range.endより前で始まっているなら被っているとみなす)
+              if (nextC.start < range.end) {
+                mergedSurface += nextC.surface;
+                j++;
+              } else {
+                break;
               }
-              i = j;
-            } else {
-              // 範囲の途中から始まるトークンはスキップ（先頭で処理済みのはずだが念のため）
-              i++;
             }
+
+            newChunks.push(mergedSurface);
+            i = j;
           } else {
-            newTokens.push(t);
+            newChunks.push(c.surface);
             i++;
           }
         }
-        processedTokens = newTokens;
+        rawChunks = newChunks;
       }
 
-      let finalWords = [];
-
-      if (groupingMode === 'word') {
-        // 単語モード: そのまま表示（空白は除外）
-        finalWords = processedTokens.map(t => t.surface).filter(s => s.trim().length > 0);
-      } else {
-        // 文節モード: POSタグに基づく結合
-        // ルール: 
-        // 自立語（名詞、動詞、形容詞など）は新しい文節の開始
-        // 付属語（助詞、助動詞）は前の文節にくっつく
-        // 接尾辞も前にくっつく
-        // 記号は、開き括弧なら次へ、閉じ括弧・句読点なら前へ
-
-        let buffer = "";
-
-        const isIndependent = (token) => {
-          const pos = token.pos;
-          const pos1 = token.pos_detail_1;
-          if (pos === '助詞' || pos === '助動詞') return false;
-          if (pos === '接尾辞') return false;
-          if (pos === '記号') {
-            // 開き括弧系は独立（というか次の自立語にくっつけたいが、ここではバッファフラッシュのトリガーにする）
-            if (/^[「『(（<\[{【]/.test(token.surface)) return true;
-            return false; // それ以外の記号（句読点など）は付属扱い
-          }
-          return true;
-        };
-
-        processedTokens.forEach((token) => {
-          if (buffer === "") {
-            buffer = token.surface;
-          } else {
-            if (isIndependent(token)) {
-              // 自立語が来たので、前のバッファを確定させる
-              // ただし、バッファが開き括弧のみの場合は結合する
-              if (/^[「『(（<\[{【]+$/.test(buffer)) {
-                buffer += token.surface;
-              } else {
-                finalWords.push(buffer);
-                buffer = token.surface;
-              }
-            } else {
-              // 付属語なのでくっつける
-              const newLength = buffer.length + token.surface.length;
-
-              // maxCharLengthを超える場合
-              if (newLength > maxCharLength) {
-                // バッファが既にmaxCharLengthを超えている場合は、そのまま追加してから分割
-                if (buffer.length >= maxCharLength) {
-                  finalWords.push(buffer);
-                  buffer = token.surface;
-                } else {
-                  // まだ超えていない場合は、トークンを追加してから判断
-                  buffer += token.surface;
-
-                  // 追加後にmaxCharLengthを大きく超える場合（1.5倍以上）は次で確実に分割
-                  if (buffer.length > maxCharLength * 1.5) {
-                    finalWords.push(buffer);
-                    buffer = "";
-                  }
-                  // maxCharLength以上だが1.5倍未満の場合は、次のトークンで判断
-                }
-              } else {
-                // maxCharLength以内なら普通に結合
-                buffer += token.surface;
-              }
-            }
-          }
-        });
-        if (buffer) finalWords.push(buffer);
-      }
-
-      setWords(finalWords);
+      setWords(rawChunks);
       indexRef.current = 0;
       accumulatedTimeRef.current = 0;
       setElapsedTime(0);
@@ -698,7 +550,7 @@ export default function App() {
       setWords(inputText.split(/[\s　]+/));
     }
 
-  }, [inputText, groupingMode, maxCharLength, tokenizer]);
+  }, [inputText, groupingMode, parser]);
 
 
 
@@ -990,21 +842,8 @@ export default function App() {
             <span role="img" aria-label="Tiger emoji" className="text-2xl">🐯</span>
           </h1>
           <p className="text-xs text-[#ff0000] font-bold blink">
-            {isTokenizerLoading ? loadingStatus : "Wait a moment... Loading... Now Loading..."}
+            Wait a moment... Loading... Now Loading...
           </p>
-          {isTokenizerLoading && (
-            <div className="w-full max-w-xs mx-auto mt-2">
-              <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 border border-gray-400">
-                <div
-                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-                  style={{ width: `${loadingProgress}%` }}
-                ></div>
-              </div>
-              <div className="text-center text-xs text-blue-600 font-bold mt-1">
-                {loadingProgress}%
-              </div>
-            </div>
-          )}
         </div>
 
         {/* 2カラムレイアウト */}

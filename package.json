@@ -10,14 +10,12 @@
         "deploy": "npm run build && gh-pages -d dist"
     },
     "dependencies": {
-        "jszip": "^3.10.1",
-        "kuromoji": "^0.1.2",
+        "budoux": "^0.7.0",
         "lucide-react": "^0.292.0",
         "pako": "^2.1.0",
         "path-browserify": "^1.0.1",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
-        "vite-plugin-node-polyfills": "^0.22.0",
         "zlibjs": "^0.3.1"
     },
     "devDependencies": {
