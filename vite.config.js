@@ -41,7 +41,7 @@ export default defineConfig({
   },
   base: '/gyoushi_reader/',
   optimizeDeps: {
-    include: ['kuromoji', 'zlibjs/bin/gunzip.min.js'],
+    include: ['kuromoji', 'zlibjs'],
   },
   build: {
     commonjsOptions: {
