@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { loadDefaultJapaneseParser } from 'budoux';
+import TinySegmenter from 'tiny-segmenter';
 
 import { Play, X, Settings, Monitor, Type } from 'lucide-react';
 
@@ -31,310 +31,271 @@ export default function App() {
   // --- 状態と参照の定義 ---
 
   // UI表示用
-
   const [inputText, setInputText] = useState('');
-
   const [words, setWords] = useState([]);
-
   const [isPlaying, setIsPlaying] = useState(false);
-
   const [wpm, setWpm] = useState(300);
-
   const [groupingMode, setGroupingMode] = useState('bunsetsu');
-
   const [maxCharLength, setMaxCharLength] = useState(4);
-
-
-
-  // ★ テーマ管理
-
   const [theme, setTheme] = useState('modern');
-
-
-
-
-
-
-
-
-
-
-
+  const [currentIndex, setCurrentIndex] = useState(0); // 現在の再生位置
   const [elapsedTime, setElapsedTime] = useState(0);
 
-
-
-  const [updateCounter, setUpdateCounter] = useState(0); // 強制更新用
-
-
-
-
-
-
-
-  // ロジック制御用 Ref
-
-  const nextWordTimeRef = useRef(0);
-
-  const indexRef = useRef(0);
-
-  const wordsRef = useRef([]);
-
-  const wpmRef = useRef(wpm);
-
-  const startTimeRef = useRef(0);
-
-  const accumulatedTimeRef = useRef(0);
-
-
-
-  // ★ 確実な停止制御のためのRef
-
-  const isPlayingRef = useRef(false);
-
-
-
-  // --- Ref同期 ---
-
-  useEffect(() => { wordsRef.current = words; }, [words]);
-
-  useEffect(() => { wpmRef.current = wpm; }, [wpm]);
-
-
-
-  // ★ isPlayingの状態をRefに常に同期させる
-
-  useEffect(() => {
-
-    isPlayingRef.current = isPlaying;
-
-  }, [isPlaying]);
+  // タイマー管理用（これだけでOK）
+  const timerRef = useRef(null);
 
 
 
   // =================================================================
-
-  // ★ 再生ループ制御 (Refによるガード付き) ★
+  // 経過時間の計算（currentIndexとwpmから自動計算）
+  // =================================================================
+  useEffect(() => {
+    const intervalMs = 60000 / wpm;
+    setElapsedTime((currentIndex * intervalMs) / 1000);
+  }, [currentIndex, wpm]);
 
   // =================================================================
-
+  // WPM変更時に再生中なら自動的に再起動
+  // =================================================================
   useEffect(() => {
-
-    // 停止中なら何もしない
-
-    if (!isPlaying) {
-
-      return;
-
-    }
-
-
-
-    let animationFrameId;
-
-
-
-    // ループ関数
-
-    const loop = (timestamp) => {
-
-      // ★ 最重要修正: Refを使って「現在の」再生状態を確認してガードする
-
-      // Reactのクロージャの性質上、ループ内の isPlaying 変数は true のまま固定される恐れがあるため、
-
-      // 常に最新の値を持つ Ref を参照して停止判定を行う。
-
-      if (!isPlayingRef.current) {
-
-        return;
-
+    if (isPlaying) {
+      // 一旦停止して再開
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
-
-
-
-      // 基準時間の初期化
-
-      if (startTimeRef.current === 0) {
-
-        startTimeRef.current = timestamp;
-
-      }
-
-
-
-      const currentWpm = wpmRef.current;
-
-      const currentWords = wordsRef.current;
-
-      const intervalMs = 60000 / currentWpm;
-
-
-
-      // 経過時間の計算と更新
-
-      const totalElapsedTime = accumulatedTimeRef.current + (timestamp - startTimeRef.current);
-
-      setElapsedTime(totalElapsedTime / 1000);
-
-
-
-      // 次の単語を表示する時間の初期化
-
-      if (nextWordTimeRef.current === 0) {
-
-        nextWordTimeRef.current = timestamp + intervalMs;
-
-      }
-
-
-
-      // 時間が来たら次の単語へ
-
-      if (timestamp >= nextWordTimeRef.current) {
-
-        const nextIndex = indexRef.current + 1;
-
-
-
-        if (nextIndex < currentWords.length) {
-
-          indexRef.current = nextIndex;
-
-          setUpdateCounter(c => c + 1); // 画面更新トリガー
-
-          nextWordTimeRef.current += intervalMs;
-
-
-
-          // 遅延補正: ブラウザバックグラウンドなどで時間が飛びすぎていたら現在時刻に同期
-
-          if (timestamp > nextWordTimeRef.current + intervalMs) {
-
-            nextWordTimeRef.current = timestamp + intervalMs;
-
+      
+      const intervalMs = 60000 / wpm;
+      timerRef.current = setInterval(() => {
+        setCurrentIndex(prev => {
+          const next = prev + 1;
+          if (next >= words.length) {
+            // 最後まで到達したら停止
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
+            setIsPlaying(false);
+            return 0; // 最初に戻す
           }
+          return next;
+        });
+      }, intervalMs);
+    }
+  }, [wpm]); // wpmが変わったら再起動
 
-        } else {
-
-          // 最後まで到達したら停止処理
-
-          setIsPlaying(false);
-
-          // Refも更新しておく（useEffectの同期を待たずに即時反映するため）
-
-          isPlayingRef.current = false;
-
-          indexRef.current = 0;
-
-          accumulatedTimeRef.current = 0;
-
-          setElapsedTime(0);
-
-          setUpdateCounter(c => c + 1);
-
-          return; // ここでリターンしてループ終了
-
-        }
-
-      }
-
-
-
-      // 次のフレームを予約
-
-      animationFrameId = requestAnimationFrame(loop);
-
-    };
-
-
-
-    // ループ開始
-
-    animationFrameId = requestAnimationFrame(loop);
-
-
-
-    // ★ クリーンアップ関数
-
+  // =================================================================
+  // コンポーネントアンマウント時のクリーンアップ
+  // =================================================================
+  useEffect(() => {
     return () => {
-
-      // アニメーションフレームを確実にキャンセル
-
-      cancelAnimationFrame(animationFrameId);
-
-
-
-      // 経過時間を保存して、開始時間をリセット
-
-      if (startTimeRef.current !== 0) {
-
-        accumulatedTimeRef.current += performance.now() - startTimeRef.current;
-
-        startTimeRef.current = 0;
-
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
-
     };
-
-  }, [isPlaying]); // isPlaying の変化のみを監視する
+  }, []);
 
 
 
 
 
   // --- 再生開始 ---
-
   const startPlay = () => {
-
-    if (words.length > 0 && indexRef.current < words.length && !isPlaying) {
-
-      startTimeRef.current = 0;
-
-      setIsPlaying(true);
-
-      // RefはuseEffectで同期されるが、念のためここでもセット
-
-      isPlayingRef.current = true;
-
+    if (words.length === 0 || currentIndex >= words.length || isPlaying) {
+      return;
     }
+    
+    setIsPlaying(true);
+    
+    const intervalMs = 60000 / wpm;
+    timerRef.current = setInterval(() => {
+      setCurrentIndex(prev => {
+        const next = prev + 1;
+        if (next >= words.length) {
+          // 最後まで到達したら停止
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          setIsPlaying(false);
+          return 0; // 最初に戻す
+        }
+        return next;
+      });
+    }, intervalMs);
+  };
 
+  // --- 再生停止 ---
+  const stopPlay = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsPlaying(false);
   };
 
 
 
   // --- シーク操作 ---
-
   const handleProgressChange = (e) => {
-
+    // まず停止
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     setIsPlaying(false);
-
-    isPlayingRef.current = false;
-
+    
+    // 新しい位置にジャンプ
     const newIndex = parseInt(e.target.value, 10);
-
-    indexRef.current = newIndex;
-
-    accumulatedTimeRef.current = 0;
-
-    setElapsedTime(0);
-
-    setUpdateCounter(c => c + 1);
-
+    setCurrentIndex(newIndex);
   };
 
 
 
   // --- テキスト解析 ---
 
-  // --- テキスト解析 ---
+  // TinySegmenterインスタンス
+  const segmenterRef = useRef(new TinySegmenter());
 
-  const [parser, setParser] = useState(null);
+  // 補助関数: 助詞を前の要素に統合
+  const mergeParticles = (tokens, particles) => {
+    const result = [];
+    for (let i = 0; i < tokens.length; i++) {
+      if (i > 0 && particles.includes(tokens[i])) {
+        // 前の要素に結合
+        result[result.length - 1] += tokens[i];
+      } else {
+        result.push(tokens[i]);
+      }
+    }
+    return result;
+  };
 
-  // BudouXの初期化
-  useEffect(() => {
-    const p = loadDefaultJapaneseParser();
-    setParser(p);
-  }, []);
+  // 補助関数: 句読点を統合
+  const mergePunctuation = (tokens, prefixPunct, suffixPunct) => {
+    const result = [];
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      
+      // 後ろに結合する記号の場合
+      if (prefixPunct.includes(token)) {
+        // 次の要素と結合
+        if (i + 1 < tokens.length) {
+          result.push(token + tokens[i + 1]);
+          i++; // 次の要素をスキップ
+        } else {
+          result.push(token);
+        }
+      }
+      // 前に結合する記号の場合
+      else if (suffixPunct.includes(token)) {
+        if (result.length > 0) {
+          result[result.length - 1] += token;
+        } else {
+          result.push(token);
+        }
+      }
+      else {
+        result.push(token);
+      }
+    }
+    return result;
+  };
+
+  // 補助関数: maxCharLengthまで結合（1単語は分割しない）
+  const mergeUpToMaxLength = (tokens, maxLength) => {
+    const result = [];
+    let current = '';
+    
+    // 文節の終端を示す記号（これらで終わる場合は次と結合しない）
+    const SENTENCE_TERMINATORS = ['」', '』', '）', '】', '。', '、'];
+    
+    // 文節の開始を示す記号（これらは必ず先頭になる）
+    const SENTENCE_STARTERS = ['「', '『', '（', '【'];
+    
+    for (let i = 0; i < tokens.length; i++) {
+      let token = tokens[i];
+      
+      // トークンに「が含まれていて、それが先頭でない場合は「の前で分割
+      const openQuotePos = token.indexOf('「');
+      if (openQuotePos > 0) {
+        // 「の前と後で分割
+        const beforeQuote = token.substring(0, openQuotePos);
+        const fromQuote = token.substring(openQuotePos);
+        
+        // 前半部分を処理
+        if (beforeQuote) {
+          if (current) {
+            result.push(current);
+            current = '';
+          }
+          result.push(beforeQuote);
+        }
+        
+        // 後半部分を新しいトークンとして処理
+        token = fromQuote;
+      }
+      
+      // 現在のトークンが既にmaxLengthより長い場合は、そのまま追加（単語の保護）
+      if (token.length > maxLength) {
+        if (current) {
+          result.push(current);
+          current = '';
+        }
+        result.push(token);
+        continue;
+      }
+      
+      // 現在のチャンクに開き括弧が含まれており、先頭でない場合は分割
+      const starterIndex = SENTENCE_STARTERS.findIndex(starter => current.includes(starter));
+      if (starterIndex !== -1 && current.length > 0 && !SENTENCE_STARTERS.includes(current[0])) {
+        // 開き括弧の位置を見つける
+        const starter = SENTENCE_STARTERS[starterIndex];
+        const starterPos = current.indexOf(starter);
+        if (starterPos > 0) {
+          // 開き括弧の前で分割
+          result.push(current.substring(0, starterPos));
+          current = current.substring(starterPos);
+        }
+      }
+      
+      // 結合しても超えない場合
+      if (current.length + token.length <= maxLength) {
+        current += token;
+      } else {
+        // 超える場合は現在のチャンクを確定
+        if (current) {
+          result.push(current);
+        }
+        current = token;
+      }
+      
+      // 「」が含まれていて、それが末尾以外にある場合は、その位置で分割
+      const closeQuotePos = current.indexOf('」');
+      if (closeQuotePos !== -1 && closeQuotePos < current.length - 1) {
+        // 「」の位置で分割（「」を含む）
+        const beforeClose = current.substring(0, closeQuotePos + 1);
+        const afterClose = current.substring(closeQuotePos + 1);
+        
+        result.push(beforeClose);
+        current = afterClose;
+      }
+      
+      // 現在のチャンクが終端記号で終わっている場合は、次と結合しない
+      const endsWithTerminator = SENTENCE_TERMINATORS.some(term => current.endsWith(term));
+      if (endsWithTerminator && current.length > 0) {
+        result.push(current);
+        current = '';
+      }
+    }
+    
+    if (current) {
+      result.push(current);
+    }
+    
+    return result;
+  };
 
   useEffect(() => {
     if (!inputText) {
@@ -343,64 +304,43 @@ export default function App() {
     }
 
     // 入力が変わったら停止
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     setIsPlaying(false);
-    isPlayingRef.current = false;
 
     try {
       let rawChunks = [];
 
-      // 単語分割用のSegmenter (共通で使用)
-      const segmenter = new Intl.Segmenter("ja-JP", { granularity: "word" });
-
       if (groupingMode === 'word') {
-        // 単語モード: Intl.Segmenter
-        // segment() returns an iterable, convert to array of strings
-        rawChunks = Array.from(segmenter.segment(inputText)).map(s => s.segment).filter(s => s.trim().length > 0);
+        // 単語モード: TinySegmenter
+        rawChunks = segmenterRef.current.segment(inputText).filter(s => s.trim().length > 0);
       } else {
-        // 文節モード: BudouX
-        let initialChunks = [];
-        if (parser) {
-          initialChunks = parser.parse(inputText);
-        } else {
-          // パーサー未ロード時は簡易分割
-          initialChunks = inputText.split(/[\s　]+/);
-        }
-
-        // ★ 長さ制限ロジックの復活
-        // BudouXのチャンクが maxCharLength を超える場合、Intl.Segmenterでさらに細かく分割して再構成する
-        rawChunks = [];
-
-        initialChunks.forEach(chunk => {
-          if (chunk.length <= maxCharLength) {
-            rawChunks.push(chunk);
-          } else {
-            // 長すぎる場合、単語単位に分解
-            const words = Array.from(segmenter.segment(chunk)).map(s => s.segment);
-
-            let buffer = "";
-            words.forEach(word => {
-              // バッファに追加しても制限内なら追加
-              if ((buffer + word).length <= maxCharLength) {
-                buffer += word;
-              } else {
-                // 制限を超える場合
-                if (buffer.length > 0) {
-                  // 既存バッファをフラッシュ
-                  rawChunks.push(buffer);
-                  buffer = word;
-                } else {
-                  // バッファが空（つまり単語単体で制限を超えている）場合
-                  // 仕方ないのでその単語をそのまま出す（あるいは文字単位で切る手もあるが、一旦これで）
-                  rawChunks.push(word);
-                  buffer = "";
-                }
-              }
-            });
-            if (buffer.length > 0) {
-              rawChunks.push(buffer);
-            }
-          }
-        });
+        // 文節モード: TinySegmenterベースの高度な統合ロジック
+        
+        // 助詞リスト
+        const PARTICLES = ['は', 'が', 'を', 'に', 'へ', 'と', 'で', 'から', 'より', 'まで', 'や', 'の', 'も'];
+        
+        // 必ず前に結合する記号（文字数カウント外）
+        const SUFFIX_PUNCTUATION = ['、', '。', '」', '』', '）', '】'];
+        
+        // 必ず後ろに結合する記号
+        const PREFIX_PUNCTUATION = ['「', '『', '（', '【'];
+        
+        // ステップ1: TinySegmenterで分割
+        let tokens = segmenterRef.current.segment(inputText).filter(s => s.trim().length > 0);
+        
+        // ステップ2: 助詞を前の要素に統合
+        tokens = mergeParticles(tokens, PARTICLES);
+        
+        // ステップ3: 句読点を統合
+        tokens = mergePunctuation(tokens, PREFIX_PUNCTUATION, SUFFIX_PUNCTUATION);
+        
+        // ステップ4: maxCharLengthまで結合（ただし1単語は分割しない）
+        tokens = mergeUpToMaxLength(tokens, maxCharLength);
+        
+        rawChunks = tokens;
       }
 
       // カスタム単語の結合処理 (カムパネルラなど)
@@ -465,18 +405,37 @@ export default function App() {
         rawChunks = newChunks;
       }
 
+      // 「っ」で終わるチャンクの後処理: 次のチャンクの1文字目を奪う
+      const processSmallTsuEndings = (chunks) => {
+        const result = [];
+        for (let i = 0; i < chunks.length; i++) {
+          const current = chunks[i];
+          const next = i < chunks.length - 1 ? chunks[i + 1] : null;
+          
+          // 現在のチャンクが「っ」で終わっていて、次のチャンクが存在する場合
+          if (current.endsWith('っ') && next && next.length > 0) {
+            // 次のチャンクの1文字目を奪う
+            result.push(current + next[0]);
+            // 次のチャンクから1文字目を削除
+            chunks[i + 1] = next.slice(1);
+          } else {
+            result.push(current);
+          }
+        }
+        // 空のチャンクを除外
+        return result.filter(c => c.length > 0);
+      };
+
+      rawChunks = processSmallTsuEndings(rawChunks);
+
       setWords(rawChunks);
-      indexRef.current = 0;
-      accumulatedTimeRef.current = 0;
-      setElapsedTime(0);
-      setUpdateCounter(c => c + 1);
+      setCurrentIndex(0);
 
     } catch (e) {
-
       setWords(inputText.split(/[\s　]+/));
     }
 
-  }, [inputText, groupingMode, parser]);
+  }, [inputText, groupingMode, maxCharLength]);
 
 
 
@@ -496,28 +455,27 @@ export default function App() {
   }, []);
 
   const loadSampleText = async (filename) => {
-
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     setIsPlaying(false);
-
-    isPlayingRef.current = false;
 
     const text = await loadTextFromFile(filename);
     if (text) {
       setInputText(text);
     }
-
   };
 
 
 
   const handleInputChange = (e) => {
-
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     setIsPlaying(false);
-
-    isPlayingRef.current = false;
-
     setInputText(e.target.value);
-
   };
 
 
@@ -568,7 +526,7 @@ export default function App() {
 
 
 
-  const currentWord = words[indexRef.current];
+  const currentWord = words[currentIndex];
 
 
 
@@ -799,7 +757,7 @@ export default function App() {
 
               `}>
 
-                <span>CHUNK: {String(indexRef.current + 1).padStart(3, '0')} / {String(words.length).padStart(3, '0')}</span>
+                <span>CHUNK: {String(currentIndex + 1).padStart(3, '0')} / {String(words.length).padStart(3, '0')}</span>
 
                 <span>CHARS: {totalChars}</span>
 
@@ -835,7 +793,7 @@ export default function App() {
 
                     max={words.length > 0 ? words.length - 1 : 0}
 
-                    value={indexRef.current}
+                    value={currentIndex}
 
                     onChange={handleProgressChange}
 
@@ -857,11 +815,19 @@ export default function App() {
 
                   <div className="flex gap-1">
 
-                    <RetroButton onClick={startPlay} disabled={isPlaying || words.length === 0 || indexRef.current >= words.length}>
+                    <RetroButton onClick={startPlay} disabled={isPlaying || words.length === 0 || currentIndex >= words.length}>
 
                       <Play size={14} className="inline mr-1" />
 
                       PLAY
+
+                    </RetroButton>
+
+                    <RetroButton onClick={stopPlay} disabled={!isPlaying}>
+
+                      <X size={14} className="inline mr-1" />
+
+                      STOP
 
                     </RetroButton>
 
