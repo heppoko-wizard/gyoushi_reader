@@ -1,10 +1,7 @@
 // ============================================================
 // 🚀 STARTUP LOG - アプリケーション起動の最初のログ
 // ============================================================
-console.log('🚀🚀🚀 [STARTUP] main.jsx loaded - Application starting...');
-console.log('📍 [STARTUP] Current location:', window.location.href);
-console.log('📍 [STARTUP] User Agent:', navigator.userAgent);
-console.log('📍 [STARTUP] Time:', new Date().toISOString());
+
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'
@@ -24,7 +21,7 @@ class ErrorBoundary extends React.Component {
 
     componentDidCatch(error, errorInfo) {
         this.setState({ error, errorInfo });
-        console.error("Uncaught error:", error, errorInfo);
+
     }
 
     render() {

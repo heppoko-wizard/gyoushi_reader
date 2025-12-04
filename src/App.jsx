@@ -16,22 +16,15 @@ async function loadTextFromFile(filename) {
   try {
     const baseUrl = import.meta.env.BASE_URL;
     const path = `${baseUrl}${filename}`.replace(/\/\/+/g, '/');
-    console.log(`Fetching text from: ${path}`);
     const response = await fetch(path);
     if (!response.ok) {
       throw new Error(`Failed to load ${filename}: ${response.status} ${response.statusText}`);
     }
     return await response.text();
   } catch (error) {
-    console.error(`Error loading ${filename}:`, error);
     return '';
   }
 }
-
-
-
-
-
 
 export default function App() {
 
@@ -479,7 +472,7 @@ export default function App() {
       setUpdateCounter(c => c + 1);
 
     } catch (e) {
-      console.warn("Segmentation failed:", e);
+
       setWords(inputText.split(/[\s　]+/));
     }
 
@@ -764,9 +757,7 @@ export default function App() {
 
             <h2 className="bg-[#eeeeee] border-l-4 border-[#ff1493] pl-2 text-sm font-bold mb-4 text-[#333333] flex items-center">
 
-              <span role="img" aria-label="Sparkles emoji" className="text-yellow-500 mr-1">✨</span>
-
-              RSVP Reader Ver.1.0
+              RSVP Reader Ver.0.7.10
 
             </h2>
 
@@ -1153,7 +1144,7 @@ export default function App() {
 
         <div className="text-center text-[10px] mt-2 text-[#ff69b4] font-['MS_PGothic']">
 
-          (C) ひかりごけ / Designed by @koba_sota78411/Since 2023.11.26
+          (C) ひかりごけ / Designed by @koba_sota78411/Since 2025.11.26
 
         </div>
 
